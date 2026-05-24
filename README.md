@@ -12,6 +12,8 @@ Membros da equipe:
 
 **Demo:** https://compstat.vercel.app/
 
+**Apresentação:** [`docs/Presentation - CoPatrulha.pdf`](docs/Presentation%20-%20CoPatrulha.pdf) · [`.pptx`](docs/Presentation%20-%20CoPatrulha.pptx) · [vídeo demo](docs/Presentation%20-%20CoPatrulha.mkv)
+
 ---
 
 ## Resumo
@@ -80,6 +82,7 @@ Crie um `.env.local` na raiz com as variáveis abaixo (ver `.env.example`):
 |---|---|
 | `BREVO_API_KEY` | Chave de API transacional do Brevo |
 | `BREVO_SENDER_EMAIL` | Remetente verificado na conta Brevo |
+| `OPEN_ROUTER_API_KEY` | Chave OpenRouter para o chatbot do Radar (server-only) |
 
 O destino das mensagens enviadas pelo formulário de contato está em `src/config/contact.ts`.
 
