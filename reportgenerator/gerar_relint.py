@@ -14,9 +14,6 @@ import pathlib
 import sys
 from collections import Counter
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import geopandas as gpd
 import pandas as pd
 import polars as pl
@@ -24,6 +21,7 @@ from anthropic import Anthropic
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from dotenv import load_dotenv
 
 CRS = "EPSG:4326"
 RELINTS_DIR = pathlib.Path("relints")
@@ -147,6 +145,7 @@ Retorne EXCLUSIVAMENTE um JSON válido:
 
 # ── 1. Extração dos RELINTs existentes ──────────────────────────────────────
 
+
 def extrair_relints() -> dict[str, dict]:
     """Parseia os 8 RELINTs existentes e extrai nomes de sub-áreas e rotas de fuga."""
     titulo_to_subar = {v["titulo"]: k for k, v in AREA_CONFIG.items()}
@@ -176,13 +175,20 @@ def extrair_relints() -> dict[str, dict]:
 
             # Bullet curto com "rotas de dispersão" = rota de fuga extraída
             escape = next(
-                (p for p in paras if ("rotas de dispersão" in p.lower() or "dispersão" in p.lower()) and len(p) < 300),
+                (
+                    p
+                    for p in paras
+                    if ("rotas de dispersão" in p.lower() or "dispersão" in p.lower())
+                    and len(p) < 300
+                ),
                 None,
             )
-            subareas.append({
-                "nome": subarea_nome,
-                "escape_route": escape,
-            })
+            subareas.append(
+                {
+                    "nome": subarea_nome,
+                    "escape_route": escape,
+                }
+            )
 
         resultado[nome_subar] = {
             "subareas": subareas,
@@ -194,9 +200,12 @@ def extrair_relints() -> dict[str, dict]:
 
 # ── 2. Carregamento dos datasets ─────────────────────────────────────────────
 
+
 def carregar_dados():
     print("Carregando datasets...")
-    areas_gdf = gpd.read_file("dados/bronze/sh_area_forca/areas_forca_municipal.shp").set_crs(CRS, allow_override=True)
+    areas_gdf = gpd.read_file(
+        "dados/bronze/sh_area_forca/areas_forca_municipal.shp"
+    ).set_crs(CRS, allow_override=True)
 
     ocorr = pl.read_csv(
         "dados/bronze/df_ocorrencias_tratado - Extração 1 .csv",
@@ -213,14 +222,19 @@ def carregar_dados():
     )
 
     fu = pl.read_csv("dados/bronze/fatores_urbanos.csv", infer_schema_length=0)
-    dd = pd.read_csv("dados/bronze/disk_denuncia.csv", sep=";", encoding="latin-1", low_memory=False)
+    dd = pd.read_csv(
+        "dados/bronze/disk_denuncia.csv", sep=";", encoding="latin-1", low_memory=False
+    )
     cam = pl.read_csv("dados/bronze/cameras_areas_fm.csv", infer_schema_length=0)
 
-    print(f"  {len(ocorr_gdf):,} ocorrências | {len(fu):,} fatores | {len(dd):,} denúncias | {len(cam):,} câmeras")
+    print(
+        f"  {len(ocorr_gdf):,} ocorrências | {len(fu):,} fatores | {len(dd):,} denúncias | {len(cam):,} câmeras"
+    )
     return areas_gdf, ocorr_gdf, fu, dd, cam
 
 
 # ── 3. Preparação dos dados por área ─────────────────────────────────────────
+
 
 def _hora_bin(h) -> str | None:
     if pd.isna(h):
@@ -238,22 +252,26 @@ def _hora_bin(h) -> str | None:
     return "noite (18h–24h)"
 
 
-def preparar_dados(nome_subar, areas_gdf, ocorr_gdf, fu_df, dd_df, cam_df) -> dict | None:
+def preparar_dados(
+    nome_subar, areas_gdf, ocorr_gdf, fu_df, dd_df, cam_df
+) -> dict | None:
     cfg = AREA_CONFIG[nome_subar]
     area_poly = areas_gdf[areas_gdf["nome_subar"] == nome_subar]
 
     # Ocorrências dentro do polígono da área FM
-    ocorr_area = gpd.sjoin(ocorr_gdf, area_poly[["geometry"]], how="inner", predicate="within")
+    ocorr_area = gpd.sjoin(
+        ocorr_gdf, area_poly[["geometry"]], how="inner", predicate="within"
+    )
     if len(ocorr_area) == 0:
         return None
 
     delito_counts = ocorr_area["desc_delito"].value_counts().head(5).to_dict()
-    top_locf = (
-        ocorr_area["locf"].dropna().str.title().value_counts().head(8).to_dict()
-    )
+    top_locf = ocorr_area["locf"].dropna().str.title().value_counts().head(8).to_dict()
     dia_counts = ocorr_area["dia_semana"].dropna().value_counts().to_dict()
     hora_dist = dict(Counter(ocorr_area["hora"].apply(_hora_bin).dropna()))
-    ano_counts = {int(k): int(v) for k, v in ocorr_area["ano"].value_counts().sort_index().items()}
+    ano_counts = {
+        int(k): int(v) for k, v in ocorr_area["ano"].value_counts().sort_index().items()
+    }
 
     # Câmeras da área
     cam_area = cam_df.filter(pl.col("nome_area_fm") == cfg["cam_nome"])
@@ -262,8 +280,7 @@ def preparar_dados(nome_subar, areas_gdf, ocorr_gdf, fu_df, dd_df, cam_df) -> di
     # Fatores urbanos da área
     fu_area = fu_df.filter(pl.col("subarea_nome") == nome_subar)
     fat_counts = (
-        fu_area
-        .group_by(["tipo_ocorrencia_descricao", "orgao_responsavel"])
+        fu_area.group_by(["tipo_ocorrencia_descricao", "orgao_responsavel"])
         .agg(pl.len().alias("n"))
         .sort("n", descending=True)
         .to_pandas()
@@ -271,7 +288,9 @@ def preparar_dados(nome_subar, areas_gdf, ocorr_gdf, fu_df, dd_df, cam_df) -> di
     )[:15]
 
     # Bairros derivados dos fatores → filtrar disk denúncia
-    bairros = [b.upper() for b in fu_area["bairro_nome"].drop_nulls().unique().to_list()]
+    bairros = [
+        b.upper() for b in fu_area["bairro_nome"].drop_nulls().unique().to_list()
+    ]
 
     dd_classes = [
         "CRIMES CONTRA O PATRIMÔNIO",
@@ -302,15 +321,17 @@ def preparar_dados(nome_subar, areas_gdf, ocorr_gdf, fu_df, dd_df, cam_df) -> di
 
 # ── 4. Chamada à API Claude ──────────────────────────────────────────────────
 
-def chamar_claude(nome_subar: str, dados: dict, relints_info: dict, client: Anthropic) -> dict:
-    cfg = AREA_CONFIG[nome_subar]
+
+def chamar_claude(
+    nome_subar: str, dados: dict, relints_info: dict, client: Anthropic
+) -> dict:
     ri = relints_info.get(nome_subar, {})
     subareas_ri = ri.get("subareas", [])
     fonte = ri.get("fonte", "N/A")
 
     subareas_txt = "\n".join(
         f'  Sub-área {i + 1}: "{s["nome"]}"\n'
-        f'  Rota de fuga (fonte: {fonte}): {s["escape_route"] or "não extraída — gere com base na localização"}'
+        f"  Rota de fuga (fonte: {fonte}): {s['escape_route'] or 'não extraída — gere com base na localização'}"
         for i, s in enumerate(subareas_ri)
     )
 
@@ -320,11 +341,11 @@ def chamar_claude(nome_subar: str, dados: dict, relints_info: dict, client: Anth
         f"  {r['tipo_ocorrencia_descricao']} ({r['orgao_responsavel']}): {r['n']}"
         for r in dados["fat_counts"]
     )
-    hora_txt = " | ".join(
-        f"{k}: {v}" for k, v in sorted(dados["hora_dist"].items())
-    )
+    hora_txt = " | ".join(f"{k}: {v}" for k, v in sorted(dados["hora_dist"].items()))
     relatos_txt = (
-        "\n".join(f"  [{i + 1}] {r[:250]}" for i, r in enumerate(dados["relatos_denuncia"]))
+        "\n".join(
+            f"  [{i + 1}] {r[:250]}" for i, r in enumerate(dados["relatos_denuncia"])
+        )
         or "Nenhum relato disponível para os bairros desta área."
     )
 
@@ -383,6 +404,7 @@ Instruções:
 
 
 # ── 5. Montagem do .docx ─────────────────────────────────────────────────────
+
 
 def _set_cell_content(cell, paragraphs_data: list[dict]) -> None:
     """Substitui todo o conteúdo da célula pelos parágrafos especificados.
@@ -478,7 +500,9 @@ def montar_docx(nome_subar: str, conteudo: dict, relints_info: dict) -> pathlib.
 
 # ── 6. Orquestração principal ────────────────────────────────────────────────
 
+
 def main() -> None:
+    load_dotenv()
     target = sys.argv[1] if len(sys.argv) > 1 else None
 
     if target:

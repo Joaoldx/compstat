@@ -13,13 +13,11 @@ Saída:
 import geopandas as gpd
 import polars as pl
 from shapely import wkt
-from shapely.geometry import Point
-import pandas as pd
 
 # ── Constantes ──────────────────────────────────────────────────────────────
-CRS = "EPSG:4326"          # WGS84 (lat/lon)
-CRS_UTM = "EPSG:31983"    # SIRGAS 2000 / UTM zone 23S (metros — Rio de Janeiro)
-BUFFER_CAMERAS_M = 200    # raio de influência das câmeras em metros
+CRS = "EPSG:4326"  # WGS84 (lat/lon)
+CRS_UTM = "EPSG:31983"  # SIRGAS 2000 / UTM zone 23S (metros — Rio de Janeiro)
+BUFFER_CAMERAS_M = 200  # raio de influência das câmeras em metros
 
 
 # ── 1. Carrega ocorrências ───────────────────────────────────────────────────
@@ -53,13 +51,17 @@ dom = pl.read_csv(
 )
 dom_pd = dom.to_pandas()
 dom_pd["geometry"] = dom_pd["geometria"].apply(wkt.loads)
-dom_gdf = gpd.GeoDataFrame(dom_pd[["nome_territorio", "dominio_orcrim", "geometry"]], crs=CRS)
+dom_gdf = gpd.GeoDataFrame(
+    dom_pd[["nome_territorio", "dominio_orcrim", "geometry"]], crs=CRS
+)
 
 # Remove 16 polígonos com coords fora do Rio (georreferenciados no Oriente Médio)
 n_antes = len(dom_gdf)
 dom_gdf = dom_gdf[dom_gdf.geometry.bounds["maxx"] < -40].reset_index(drop=True)
 n_removidos = n_antes - len(dom_gdf)
-print(f"  {len(dom_gdf):,} territórios | {n_removidos} removidos (coords fora do Rio) | domínios: {dom_gdf['dominio_orcrim'].unique().tolist()}")
+print(
+    f"  {len(dom_gdf):,} territórios | {n_removidos} removidos (coords fora do Rio) | domínios: {dom_gdf['dominio_orcrim'].unique().tolist()}"
+)
 
 
 # ── 3. Carrega câmeras ───────────────────────────────────────────────────────
@@ -67,7 +69,9 @@ print("Carregando câmeras...")
 cam = pl.read_csv("dados/bronze/cameras_areas_fm.csv", infer_schema_length=0)
 cam_pd = cam.to_pandas()
 cam_pd["geometry"] = cam_pd["geometry"].apply(wkt.loads)
-cam_gdf = gpd.GeoDataFrame(cam_pd[["id_ponto", "nome_area_fm", "id_trecho", "geometry"]], crs=CRS)
+cam_gdf = gpd.GeoDataFrame(
+    cam_pd[["id_ponto", "nome_area_fm", "id_trecho", "geometry"]], crs=CRS
+)
 print(f"  {len(cam_gdf):,} câmeras | {cam_gdf['nome_area_fm'].nunique()} áreas FM")
 
 
@@ -85,7 +89,9 @@ ocorr_dom = gpd.sjoin(
 ocorr_dom = ocorr_dom.drop(columns=["index_right"])
 
 n_matched = ocorr_dom["dominio_orcrim"].notna().sum()
-print(f"  {n_matched:,} ocorrências dentro de algum território ({n_matched/len(ocorr_dom)*100:.1f}%)")
+print(
+    f"  {n_matched:,} ocorrências dentro de algum território ({n_matched / len(ocorr_dom) * 100:.1f}%)"
+)
 
 # Salva
 ocorr_dom_out = pl.from_pandas(
@@ -120,19 +126,22 @@ ocorr_cam = ocorr_cam.drop(columns=["index_right"])
 ocorr_cam["tem_camera"] = ocorr_cam["id_ponto"].notna()
 
 n_com_camera = ocorr_cam["tem_camera"].sum()
-print(f"  {n_com_camera:,} ocorrências a ≤{BUFFER_CAMERAS_M}m de câmera ({n_com_camera/len(ocorr_cam)*100:.1f}%)")
+print(
+    f"  {n_com_camera:,} ocorrências a ≤{BUFFER_CAMERAS_M}m de câmera ({n_com_camera / len(ocorr_cam) * 100:.1f}%)"
+)
 
 # Salva (deduplicando por ocorrência — mantém a primeira câmera associada)
 ocorr_cam_dedup = (
-    ocorr_cam
-    .sort_values("id_ponto", na_position="last")
+    ocorr_cam.sort_values("id_ponto", na_position="last")
     .drop_duplicates(subset=["id_criptografado"])
     .drop(columns=["geometry"])
     .reset_index(drop=True)
 )
 n_com_camera_dedup = ocorr_cam_dedup["tem_camera"].sum()
 total_dedup = len(ocorr_cam_dedup)
-print(f"  {n_com_camera_dedup:,} ocorrências únicas a ≤{BUFFER_CAMERAS_M}m de câmera ({n_com_camera_dedup/total_dedup*100:.1f}% do total)")
+print(
+    f"  {n_com_camera_dedup:,} ocorrências únicas a ≤{BUFFER_CAMERAS_M}m de câmera ({n_com_camera_dedup / total_dedup * 100:.1f}% do total)"
+)
 ocorr_cam_out = pl.from_pandas(ocorr_cam_dedup)
 ocorr_cam_out.write_csv("dados/silver/ocorrencias_com_camera.csv")
 print("  -> dados/silver/ocorrencias_com_camera.csv")
@@ -164,9 +173,9 @@ print("  -> dados/gold/resumo_roubos_por_area_fm.csv")
 
 
 # ── 7. Imprime tabelas de resumo no console ──────────────────────────────────
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("ROUBOS POR DOMÍNIO CRIMINAL (total 2020–2024)")
-print("="*60)
+print("=" * 60)
 print(
     pl.from_pandas(ocorr_dom.drop(columns=["geometry"]))
     .filter(pl.col("dominio_orcrim").is_not_null())
@@ -175,9 +184,9 @@ print(
     .sort("n_ocorrencias", descending=True)
 )
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("ROUBOS POR ÁREA FM — com câmera (≤200m) vs sem câmera")
-print("="*60)
+print("=" * 60)
 print(
     pl.from_pandas(ocorr_cam_dedup)
     .group_by(["nome_area_fm", "tem_camera"])
