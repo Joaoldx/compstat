@@ -1,9 +1,17 @@
+import type { Metadata } from "next"
 import { Geist, Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
 import { SiteHeader } from "@/components/layout/site-header"
 import { AppProviders } from "@/components/providers"
 import { cn } from "@/lib/utils"
+
+export const metadata: Metadata = {
+  title: "CoPatrulha",
+  icons: {
+    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
+  },
+}
 
 const interHeading = Inter({
   subsets: ["latin"],

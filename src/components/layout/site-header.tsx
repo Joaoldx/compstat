@@ -16,7 +16,7 @@ export function SiteHeader() {
           href="/"
           className="justify-self-start font-heading text-lg font-semibold tracking-tight text-foreground"
         >
-          Compstat
+          CoPatrulha
         </Link>
         <nav aria-label="Navegação principal" className="justify-self-center">
           <NavLinks />
