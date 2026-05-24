@@ -1,6 +1,6 @@
 "use client"
 
-import { Bot, Loader2 } from "lucide-react"
+import { Bot, FileDown, Loader2 } from "lucide-react"
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -10,17 +10,21 @@ import {
   useState,
 } from "react"
 
+import { downloadRadarSecurityPdf } from "@/lib/radar/download-security-pdf"
 import { cn } from "@/lib/utils"
+import type { RadarChatUIMessage, VisibleChatRole } from "@/types/radar-chat-ui"
 
 /** Mensagens persistidas apenas no cliente até enviar novo pedido ao servidor — nunca exponha aqui uma chave de API. */
 
-type VisibleRole = "user" | "assistant"
+export type { RadarChatUIMessage } from "@/types/radar-chat-ui"
 
-export type RadarChatUIMessage = Readonly<{
-  id: string
-  role: VisibleRole
-  content: string
-}>
+function createId(role: VisibleChatRole): string {
+  try {
+    return `${role}-${crypto.randomUUID()}`
+  } catch {
+    return `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+}
 
 type ChatbotDemoPanelProps = Readonly<{ className?: string }>
 
@@ -38,14 +42,6 @@ const PLACEHOLDER = "Insira aqui a sua dúvida e observações"
 
 const EMPTY_PROMPT_NOTICE =
   "Escreva uma dúvida no campo ou toque numa das sugestões para continuar."
-
-function createId(role: VisibleRole): string {
-  try {
-    return `${role}-${crypto.randomUUID()}`
-  } catch {
-    return `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  }
-}
 
 function buildApiPayload(history: RadarChatUIMessage[]) {
   return history.map(({ role, content }) => ({ role, content }))
@@ -183,6 +179,10 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
     setEmptyActionHint(null)
   }
 
+  const handleDownloadSecurityPdf = useCallback(() => {
+    downloadRadarSecurityPdf(messages)
+  }, [messages])
+
   return (
     <div
       className={cn(
@@ -303,7 +303,15 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
               Enter envia • Shift + Enter permite nova linha • {draft.length}/{MAX_INPUT_CHARS}{" "}
               caracteres
             </p>
-            <div className="flex justify-end">
+            <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadSecurityPdf}
+                className="border-zinc-600/85 text-zinc-100 hover:bg-zinc-800/90 inline-flex items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-medium transition-colors"
+              >
+                <FileDown className="size-4 shrink-0" aria-hidden />
+                Baixar PDF da situação
+              </button>
               <button
                 type="button"
                 onClick={handleGenerateReport}

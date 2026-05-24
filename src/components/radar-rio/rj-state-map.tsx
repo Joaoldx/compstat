@@ -2,8 +2,9 @@
 
 import "maplibre-gl/dist/maplibre-gl.css"
 
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson"
 import { useTheme } from "next-themes"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Map, { Layer, NavigationControl, Popup, Source } from "react-map-gl/maplibre"
 import type { MapLayerMouseEvent } from "maplibre-gl"
 import type { MapRef } from "react-map-gl/maplibre"
@@ -20,12 +21,25 @@ import {
   RJ_ESTADO_INITIAL_VIEW,
   RJ_ESTADO_MAX_BOUNDS,
 } from "@/config/rj-estado-map"
-import { cn } from "@/lib/utils"
+import type { RadarCrimeSeverity } from "@/lib/radar/load-radar-rj-crossed"
+import {
+  fetchRadarRJCrosswalk,
+  RADAR_RJ_CROSSED_CSV_URL,
+} from "@/lib/radar/load-radar-rj-crossed"
 import { RADAR_RJ_MACROREGIOES_GEOJSON } from "@/data/radar-rio/mock-macroregions"
-import type { RadarMacroRegiaoScenario } from "@/data/radar-rio/mock-macroregions"
+import { cn } from "@/lib/utils"
+
+type RadarMapLayers = FeatureCollection<
+  Polygon | MultiPolygon,
+  Record<string, string | number | undefined>
+>
+
+type DataMode = "territorio" | "demo"
 
 type RjStateMapProps = {
   className?: string
+  /** Origem CSV (defaults `RADAR_RJ_CROSSED_CSV_URL`). */
+  csvUrl?: string
 }
 
 type RadarMacroHover = Readonly<{
@@ -34,8 +48,9 @@ type RadarMacroHover = Readonly<{
   regiao: string
   tipoCrime: string
   indice: number
-  nivel: RadarMacroRegiaoScenario
+  nivel: RadarCrimeSeverity
   ocorrencias: number
+  dominioOrcrim?: string
 }>
 
 /** Expressão MapLibre `fill-color`; outline/linhas variam com o tema do mapa base. */
@@ -53,24 +68,50 @@ const MACRO_FILL_MATCH = [
   "rgba(100, 116, 139, 0.4)",
 ] as const
 
-const NIVEL_LABEL: Record<RadarMacroRegiaoScenario, string> = {
-  critico: "Crítico (simulado)",
-  elevado: "Elevado (simulado)",
-  moderado: "Moderado (simulado)",
-  acompanhar: "Baixa / acompanhar (simulado)",
+const NIVEL_LABEL_DEMO: Record<RadarCrimeSeverity, string> = {
+  critico: "Crítico",
+  elevado: "Elevado",
+  moderado: "Moderado",
+  acompanhar: "Baixa / acompanhar",
+}
+
+const NIVEL_LABEL_POPUP_DEMO: Record<RadarCrimeSeverity, string> = {
+  critico: `${NIVEL_LABEL_DEMO.critico} (demo)`,
+  elevado: `${NIVEL_LABEL_DEMO.elevado} (demo)`,
+  moderado: `${NIVEL_LABEL_DEMO.moderado} (demo)`,
+  acompanhar: `${NIVEL_LABEL_DEMO.acompanhar} (demo)`,
+}
+
+/** Texto só no tooltip — relativos aos quantis dentro dos polígonos com ocorrências. */
+const NIVEL_LABEL_POPUP_TERRITORIO: Record<RadarCrimeSeverity, string> = {
+  critico:
+    `${NIVEL_LABEL_DEMO.critico} — classe relativa (entre territórios com contagens positivas).`,
+  elevado: `${NIVEL_LABEL_DEMO.elevado} — classe relativa (entre contagens positivas).`,
+  moderado: `${NIVEL_LABEL_DEMO.moderado} — classe relativa (entre contagens positivas).`,
+  acompanhar: `${NIVEL_LABEL_DEMO.acompanhar} — menor volume relativo.`,
 }
 
 function readHover(ev: MapLayerMouseEvent): RadarMacroHover | null {
   const f = ev.features?.[0]?.properties as
     | Record<string, string | number | undefined>
     | undefined
-  if (
-    !f ||
-    typeof f.regiao !== "string" ||
-    typeof f.tipo_crime !== "string" ||
-    typeof f.indice_prioridade !== "number"
-  )
-    return null
+  if (!f) return null
+
+  const nome =
+    typeof f.nome_territorio === "string" ? f.nome_territorio.trim() : ""
+  const regiao =
+    typeof f.regiao === "string"
+      ? f.regiao.trim()
+      : nome.length > 0
+        ? nome
+        : ""
+
+  const tipoCrimeBruto =
+    typeof f.tipo_crime === "string" ? f.tipo_crime.trim() : ""
+  const tipoCrime =
+    tipoCrimeBruto.length > 0
+      ? tipoCrimeBruto
+      : "Sem descrição de delito disponível"
 
   const nivelRaw = typeof f.nivel === "string" ? f.nivel : ""
   if (
@@ -78,26 +119,51 @@ function readHover(ev: MapLayerMouseEvent): RadarMacroHover | null {
     nivelRaw !== "elevado" &&
     nivelRaw !== "moderado" &&
     nivelRaw !== "acompanhar"
-  ) {
+  )
     return null
+
+  const nivel = nivelRaw as RadarCrimeSeverity
+
+  const idxRaw = f.indice_prioridade
+  const idxNum =
+    typeof idxRaw === "number"
+      ? idxRaw
+      : Number(typeof idxRaw === "string" ? idxRaw.trim() : String(idxRaw ?? ""))
+  const idx = Number.isFinite(idxNum) ? idxNum : 0
+
+  let ocorr = 0
+  if (typeof f.total_ocorrencias === "number") {
+    ocorr = f.total_ocorrencias
+  } else if (typeof f.ocorrencias === "number") {
+    ocorr = f.ocorrencias
+  } else if (typeof f.ocorrencias_mock === "number") {
+    ocorr = f.ocorrencias_mock
   }
 
-  const nivel = nivelRaw as RadarMacroRegiaoScenario
-
-  const ocorr = typeof f.ocorrencias_mock === "number" ? f.ocorrencias_mock : 0
+  const dominio =
+    typeof f.dominio_orcrim === "string" ? f.dominio_orcrim.trim() : ""
 
   return {
     lng: ev.lngLat.lng,
     lat: ev.lngLat.lat,
-    regiao: f.regiao,
-    tipoCrime: f.tipo_crime,
-    indice: f.indice_prioridade,
+    regiao: regiao.length > 0 ? regiao : "Território",
+    tipoCrime,
+    indice: idx,
     nivel,
     ocorrencias: ocorr,
+    ...(dominio.length > 0 ? { dominioOrcrim: dominio } : {}),
   }
 }
 
-function MacroPopup({ hover }: { hover: RadarMacroHover }) {
+function MacroPopup({
+  hover,
+  nivelLabels,
+  dataMode,
+}: {
+  hover: RadarMacroHover
+  nivelLabels: Record<RadarCrimeSeverity, string>
+  dataMode: DataMode
+}) {
   return (
     <Popup
       anchor="bottom"
@@ -112,23 +178,29 @@ function MacroPopup({ hover }: { hover: RadarMacroHover }) {
         <p className="border-b border-border pb-1 font-semibold text-foreground">
           {hover.regiao}
         </p>
+        {hover.dominioOrcrim ? (
+          <p className="text-muted-foreground mt-1 text-[11px]">
+            Domínio (OCRIM):{" "}
+            <span className="font-medium text-foreground">{hover.dominioOrcrim}</span>
+          </p>
+        ) : null}
         <p className="text-muted-foreground mt-2 text-[10px] font-medium uppercase tracking-wider">
-          Crimes simulados · não oficial
+          {dataMode === "demo" ? "Dados apenas ilustrativos" : "Contagens no polígono"}
         </p>
         <p className="text-muted-foreground mt-2 text-xs">
-          Tipologia predominante:{" "}
+          Tipologia predominante registrada (agregação):{" "}
           <span className="font-medium text-foreground">{hover.tipoCrime}</span>
         </p>
         <p className="text-muted-foreground mt-2 text-xs tracking-wide">
-          Gravidade estimada:{" "}
-          <span className="text-foreground">{NIVEL_LABEL[hover.nivel]}</span>
+          Gravidade (relativa):{" "}
+          <span className="text-foreground">{nivelLabels[hover.nivel]}</span>
         </p>
         <p className="text-muted-foreground mt-0.5 text-xs">
-          Índice relativo (demo):{" "}
+          Índice sintético:{" "}
           <span className="text-foreground">{hover.indice}</span>
         </p>
         <p className="text-muted-foreground mt-0.5 text-xs">
-          Ocorrências sintéticas:{" "}
+          Registros com localização dentro do polígono:{" "}
           <span className="text-foreground">{hover.ocorrencias}</span>
         </p>
       </div>
@@ -136,11 +208,59 @@ function MacroPopup({ hover }: { hover: RadarMacroHover }) {
   )
 }
 
-/** MapLibre: Estado do RJ com polígonos simulando incidência de crimes por área (fictício). */
-export function RjStateMap({ className }: RjStateMapProps) {
+/** MapLibre: Estado do RJ — polígonos de território + ocorrências agregadas (CSV) ou modo demo. */
+export function RjStateMap({
+  className,
+  csvUrl = RADAR_RJ_CROSSED_CSV_URL,
+}: RjStateMapProps) {
   const mapRef = useRef<MapRef>(null)
   const [hover, setHover] = useState<RadarMacroHover | null>(null)
   const { resolvedTheme } = useTheme()
+
+  const [layers, setLayers] = useState<RadarMapLayers | null>(null)
+  const [dataMode, setDataMode] = useState<DataMode>("territorio")
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null)
+  /** Só permite fallback demo em falha ao carregar; evita regressão silenciosa em produção. */
+  const [allowDemoFallback] = useState(() => process.env.NODE_ENV !== "production")
+
+  const nivelLegend = NIVEL_LABEL_DEMO
+
+  const nivelPopupLabels =
+    dataMode === "demo" ? NIVEL_LABEL_POPUP_DEMO : NIVEL_LABEL_POPUP_TERRITORIO
+
+  const displayLayers = useMemo<RadarMapLayers>(() => {
+    if (layers) return layers
+    return RADAR_RJ_MACROREGIOES_GEOJSON as RadarMapLayers
+  }, [layers])
+
+  useEffect(() => {
+    let cancel = false
+    setLayers(null)
+
+    fetchRadarRJCrosswalk(csvUrl)
+      .then((fc) => {
+        if (!cancel) {
+          setDataMode("territorio")
+          setLoadErrorMessage(null)
+          setLayers(fc as RadarMapLayers)
+        }
+      })
+      .catch((e: unknown) => {
+        if (cancel) return
+        const msg = e instanceof Error ? e.message : String(e ?? "erro desconhecido")
+        setLoadErrorMessage(msg)
+        if (allowDemoFallback) {
+          setDataMode("demo")
+          setLayers(RADAR_RJ_MACROREGIOES_GEOJSON as RadarMapLayers)
+        } else {
+          setLayers(null)
+        }
+      })
+
+    return () => {
+      cancel = true
+    }
+  }, [csvUrl, allowDemoFallback])
 
   const isDarkBasemap = resolvedTheme === "dark"
   const mapStyleUrl = isDarkBasemap ? RADAR_MAP_DARK_STYLE_URL : RADAR_MAP_LIGHT_STYLE_URL
@@ -197,6 +317,40 @@ export function RjStateMap({ className }: RjStateMapProps) {
     setHover(null)
   }, [])
 
+  const stillLoadingTerritorio =
+    layers === null && dataMode !== "demo" && loadErrorMessage === null
+
+  if (stillLoadingTerritorio) {
+    return (
+      <div
+        className={cn(
+          "relative flex min-h-[400px] w-full flex-1 items-center justify-center rounded-xl border border-border bg-muted text-sm text-muted-foreground",
+          className
+        )}
+      >
+        Carregando território e agregações (CSV público)…
+      </div>
+    )
+  }
+
+  /** Produção sem demo: falhou e não há camada substituta. */
+  const failedProdWithoutLayers =
+    loadErrorMessage && layers === null && !allowDemoFallback
+
+  if (failedProdWithoutLayers) {
+    return (
+      <div
+        className={cn(
+          "relative flex min-h-[400px] flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-muted-foreground",
+          className
+        )}
+      >
+        <p className="font-medium text-destructive">Não foi possível carregar o mapa Radar.</p>
+        <p className="max-w-md text-xs">{loadErrorMessage}</p>
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -227,12 +381,18 @@ export function RjStateMap({ className }: RjStateMapProps) {
             })
           }}
         >
-          <Source data={RADAR_RJ_MACROREGIOES_GEOJSON} id={RADAR_MACRO_SOURCE_ID} type="geojson">
+          <Source data={displayLayers} id={RADAR_MACRO_SOURCE_ID} type="geojson">
             <Layer {...macroLayers.fillLayer} />
             <Layer {...macroLayers.lineLayer} />
           </Source>
 
-          {hover ? <MacroPopup hover={hover} /> : null}
+          {hover ? (
+            <MacroPopup
+              dataMode={dataMode}
+              hover={hover}
+              nivelLabels={nivelPopupLabels}
+            />
+          ) : null}
 
           <NavigationControl
             visualizePitch={false}
@@ -246,27 +406,27 @@ export function RjStateMap({ className }: RjStateMapProps) {
         </Map>
       </div>
 
-      <div className="pointer-events-none absolute top-3 left-3 z-10 max-w-[150px] text-[10px] leading-snug text-muted-foreground">
+      <div className="pointer-events-none absolute top-3 left-3 z-10 max-w-[180px] text-[10px] leading-snug text-muted-foreground">
         <div className="bg-background/90 rounded-lg border border-border px-2.5 py-2 shadow-sm ring-1 ring-border backdrop-blur-sm">
           <p className="border-b border-border pb-1 font-semibold uppercase tracking-wider">
-            Incidência (simulação)
+            Prioridade territorial
           </p>
           <ul className="text-foreground mt-2 space-y-1.5 font-medium">
             <li className="flex items-center gap-2">
               <span aria-hidden className="size-2.5 rounded-sm bg-emerald-500/80" />
-              Baixa · acompanhar
+              {nivelLegend.acompanhar}
             </li>
             <li className="flex items-center gap-2">
               <span aria-hidden className="size-2.5 rounded-sm bg-amber-500/80" />
-              Moderado
+              {nivelLegend.moderado}
             </li>
             <li className="flex items-center gap-2">
               <span aria-hidden className="size-2.5 rounded-sm bg-orange-500/85" />
-              Elevado
+              {nivelLegend.elevado}
             </li>
             <li className="flex items-center gap-2">
               <span aria-hidden className="size-2.5 rounded-sm bg-red-500/85" />
-              Crítico
+              {nivelLegend.critico}
             </li>
           </ul>
         </div>
@@ -280,7 +440,11 @@ export function RjStateMap({ className }: RjStateMapProps) {
         )}
       >
         <span className="bg-background/90 rounded-md border border-border px-2 py-1 backdrop-blur-sm">
-          Polígonos simulados de crimes por área — dados não oficiais
+          {dataMode === "demo"
+            ? "Demonstração sem CSV — dados de grade não são oficiais."
+            : loadErrorMessage
+              ? `Modo fallback (dev): erro ao ler CSV (${loadErrorMessage.slice(0, 90)}…) — utilizando dados simulados.`
+              : "Polígonos de território (fonte OCRIM) × ocorrências com localização no polígono — apenas georreferências coincidentes."}
         </span>
       </div>
     </div>

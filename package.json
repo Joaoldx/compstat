@@ -9,11 +9,13 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "radar:crossed": "node scripts/build-radar-rj-crossed.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.16.0",
     "maplibre-gl": "^5.24.0",
     "next": "16.1.7",

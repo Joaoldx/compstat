@@ -39,8 +39,13 @@ export function RadarDashboard() {
           </span>
         </h1>
         <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground lg:mx-0">
-          Mapa do Estado do Rio com polígonos simulados de incidência de crimes por área —
-          dados apenas ilustrativos.
+          Vista do Estado do RJ com polígonos de território (OCRIM) e registros de
+          ocorrências cujo ponto geométrico cai dentro de cada área — agregações por ano
+          e delito predominante vêm do ficheiro CSV gerado pelo script{" "}
+          <code className="rounded bg-muted px-1 py-px text-xs">
+            npm run radar:crossed
+          </code>
+          .
         </p>
       </header>
 

@@ -4,12 +4,14 @@ import type {
   Polygon,
 } from "geojson"
 
+import type { RadarCrimeSeverity } from "@/lib/radar/load-radar-rj-crossed"
+
 /**
  * Polígonos fictícios em grelha sobre o Estado do RJ (/radar), com rótulos de
  * crimes simulados — não são contagens reais nem limites oficiais (IBGE/OCRIM).
  */
 
-export type RadarCrimeSeverity = "critico" | "elevado" | "moderado" | "acompanhar"
+export type { RadarCrimeSeverity }
 
 export type RadarMacroRegiaoScenario = RadarCrimeSeverity
 

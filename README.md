@@ -32,3 +32,20 @@ Crie um `.env` ou `.env.local` na raíz com variáveis **só para o servidor** (
 | `BREVO_SENDER_EMAIL` | Remetente **verificado** na conta Brevo (uso no campo `sender` da API).    |
 
 Um modelo está em `.env.example`. O destino das mensagens está em `src/config/contact.ts`.
+
+## Radar Rio (`/radar`) — dados cruzados territorial × ocorrências
+
+1. Fontes esperadas sob uma pasta `{dados}` (ex.: `RADAR_SOURCES_DIR` ou argumento `--sources=`):
+   - `outros dados/dominio_territorial - Extração 1.csv`
+   - `df_ocorrencias_tratado - Extração 1 .csv`
+2. Gerar artefacto público (~`public/data/radar-rj-crossed.csv`):
+
+   ```bash
+   npm run radar:crossed -- --sources=/abs/caminho/para/{dados}
+   ```
+
+   ou `RADAR_SOURCES_DIR=/abs/caminho/para/{dados} npm run radar:crossed`
+
+3. A página `/radar` obtém esse CSV por URL (`/data/radar-rj-crossed.csv`) e pinta um `FeatureCollection` no MapLibre. Em desenvolvimento, se o ficheiro faltar ou o `fetch` falhar, volta-se aos polígonos de demonstração; em produção exibe-se erro.
+
+Ver documentação técnica do schema no comentário de topo de `scripts/build-radar-rj-crossed.mjs` ou na primeira linha do CSV gerado (`territorio_id`, `geometria` WKT, totais por ano dinâmicos `ano_*`, JSONs auxiliares, etc.).
