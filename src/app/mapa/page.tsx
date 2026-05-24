@@ -8,7 +8,7 @@ export default function MapaPage() {
           Domínios territoriais
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Passe o rato sobre os polígonos para ver o território e a organização
+          Passe o cursor sobre os polígonos para ver o território e a organização
           criminosa (OCRIM).
         </p>
       </header>

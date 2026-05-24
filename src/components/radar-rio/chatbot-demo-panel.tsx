@@ -10,7 +10,8 @@ import {
   useState,
 } from "react"
 
-import { downloadRadarSecurityPdf } from "@/lib/radar/download-security-pdf"
+import { downloadRadarAssistantReportPdf } from "@/lib/radar/download-security-pdf"
+import { fetchRadarAssistantPdfExecutiveBullets } from "@/lib/radar/radar-assistant-pdf-refine"
 import { cn } from "@/lib/utils"
 import type { RadarChatUIMessage, VisibleChatRole } from "@/types/radar-chat-ui"
 
@@ -26,22 +27,28 @@ function createId(role: VisibleChatRole): string {
   }
 }
 
-type ChatbotDemoPanelProps = Readonly<{ className?: string }>
+type ChatbotDemoPanelProps = Readonly<{
+  className?: string
+  /** PDF do mapa (filtros visíveis) — mesmo fluxo que o botão sob o mapa. */
+  onExportRadarPagePdf?: () => void
+  /** CSV a carregar ou erro fatal — igual a `radarReportDisabled` no dashboard. */
+  radarPagePdfDisabled?: boolean
+}>
 
 const MAX_INPUT_CHARS = 8_000
 
 const GREETING_PT =
-  "Olá — sou o analista e ajudo você a interpretar os dados que pretende mitigar. O que você gostaria de fazer?"
+  "Olá — sou o analista e ajudo você a interpretar os dados que quer mitigar. O que você gostaria de fazer?"
 
 const PILLS = [
-  "Gerar relatório com os dados filtrados",
+  "Explique o que os filtros atuais do mapa devem destacar nos polígonos",
   "Trazer dados de Méier e Vila Valqueire em 2023",
 ] as const
 
-const PLACEHOLDER = "Insira aqui a sua dúvida e observações"
+const PLACEHOLDER = "Digite sua dúvida e observações"
 
 const EMPTY_PROMPT_NOTICE =
-  "Escreva uma dúvida no campo ou toque numa das sugestões para continuar."
+  "Escreva uma dúvida no campo ou toque em uma das sugestões para continuar."
 
 function buildApiPayload(history: RadarChatUIMessage[]) {
   return history.map(({ role, content }) => ({ role, content }))
@@ -61,7 +68,7 @@ async function fetchAssistantReply(
     })
   } catch {
     throw new Error(
-      "Sem ligação ao servidor ou rede indisponível. Verifique a sua internet.",
+      "Não foi possível conectar ao servidor ou a rede está indisponível. Verifique sua conexão.",
     )
   }
 
@@ -83,16 +90,21 @@ async function fetchAssistantReply(
   }
 
   if (typeof envelope.content !== "string" || envelope.content.trim() === "") {
-    throw new Error("O assistente devolveu uma resposta estranha. Tente de novo.")
+    throw new Error("O assistente retornou uma resposta estranha. Tente de novo.")
   }
 
   return envelope.content.trim()
 }
 
-export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
+export function ChatbotDemoPanel({
+  className,
+  onExportRadarPagePdf,
+  radarPagePdfDisabled = false,
+}: ChatbotDemoPanelProps) {
   const [messages, setMessages] = useState<RadarChatUIMessage[]>([])
   const [draft, setDraft] = useState("")
   const [loading, setLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [emptyActionHint, setEmptyActionHint] = useState<string | null>(null)
 
@@ -110,12 +122,14 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
     return () => window.clearTimeout(t)
   }, [emptyActionHint])
 
-  const disabled =
-    loading || draft.trim().length === 0 || draft.length > MAX_INPUT_CHARS
+  const disabledSubmit =
+    loading || pdfLoading || draft.trim().length === 0 || draft.length > MAX_INPUT_CHARS
+
+  const chatBusyOrBlocking = loading || pdfLoading
 
   const submit = useCallback(async () => {
     const text = draft.trim()
-    if (text === "" || text.length > MAX_INPUT_CHARS) return
+    if (text === "" || text.length > MAX_INPUT_CHARS || pdfLoading) return
 
     const userTurn: RadarChatUIMessage = {
       id: createId("user"),
@@ -151,9 +165,33 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
     } finally {
       setLoading(false)
     }
-  }, [draft, messages])
+  }, [draft, messages, pdfLoading])
 
-  function handleGenerateReport() {
+  async function handleAssistantPdfExport() {
+    if (pdfLoading || loading) return
+    setPdfLoading(true)
+    setError(null)
+
+    try {
+      let bullets: string | null = null
+      if (messages.length > 0) {
+        try {
+          bullets = await fetchRadarAssistantPdfExecutiveBullets(messages)
+        } catch {
+          bullets = null
+        }
+      }
+      downloadRadarAssistantReportPdf({
+        messages,
+        executiveBulletsMarkdown: bullets,
+      })
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  function onSubmitForm(e: FormEvent) {
+    e.preventDefault()
     if (draft.trim() === "") {
       setEmptyActionHint(EMPTY_PROMPT_NOTICE)
       return
@@ -161,15 +199,10 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
     void submit()
   }
 
-  function onSubmitForm(e: FormEvent) {
-    e.preventDefault()
-    void submit()
-  }
-
   function onKeyDownArea(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return
 
-    if (disabled) return
+    if (disabledSubmit) return
     e.preventDefault()
     void submit()
   }
@@ -178,10 +211,6 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
     setDraft(text)
     setEmptyActionHint(null)
   }
-
-  const handleDownloadSecurityPdf = useCallback(() => {
-    downloadRadarSecurityPdf(messages)
-  }, [messages])
 
   return (
     <div
@@ -216,6 +245,20 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
             </p>
           </div>
         </div>
+        {onExportRadarPagePdf ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={radarPagePdfDisabled}
+              onClick={onExportRadarPagePdf}
+              title="Exportar filtros atuais e territórios visíveis em PDF"
+              className="border-[#26C2D1]/40 text-[#cfeff3] hover:bg-[#26C2D1]/12 disabled:pointer-events-none disabled:opacity-50 inline-flex items-center gap-2 rounded-lg border bg-zinc-800/75 px-3 py-2 text-[13px] font-medium shadow-inner ring-1 ring-white/[0.06] transition-colors"
+            >
+              <FileDown className="size-3.5 shrink-0" aria-hidden />
+              Gerar relatório
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {/* Zona principal — caixa mais escura sugerindo o mock */}
@@ -254,7 +297,7 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
               {loading ? (
                 <div className="text-zinc-500 flex items-center gap-2 py-1 text-[13px]">
                   <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                  <span>A elaborar uma resposta…</span>
+                  <span>Elaborando uma resposta…</span>
                 </div>
               ) : null}
             </div>
@@ -267,7 +310,7 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
               key={label}
               type="button"
               onClick={() => applySuggestion(label)}
-              disabled={loading}
+              disabled={chatBusyOrBlocking}
               className="border-zinc-600/80 text-zinc-100 hover:bg-zinc-800/85 disabled:pointer-events-none disabled:opacity-50 rounded-full border px-4 py-2 text-left text-[13px] leading-snug transition-colors"
             >
               {label}
@@ -286,13 +329,15 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
             maxLength={MAX_INPUT_CHARS}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDownArea}
-            placeholder={loading ? "A aguardar resposta…" : PLACEHOLDER}
+            placeholder={
+              loading ? "Aguardando resposta…" : pdfLoading ? "Preparando PDF…" : PLACEHOLDER
+            }
             aria-describedby="radar-chat-hint"
             className={cn(
               "border-zinc-700/85 bg-black/55 text-zinc-100 placeholder:text-zinc-600 w-full resize-y rounded-2xl border px-3.5 py-3 text-[14px] leading-relaxed outline-none ring-1 ring-transparent transition-[box-shadow] focus-visible:ring-[#26C2D1]/55",
-              loading && "pointer-events-none opacity-80",
+              chatBusyOrBlocking && "pointer-events-none opacity-80",
             )}
-            disabled={loading}
+            disabled={chatBusyOrBlocking}
           />
 
           <div className="pt-1">
@@ -300,41 +345,45 @@ export function ChatbotDemoPanel({ className }: ChatbotDemoPanelProps) {
               id="radar-chat-hint"
               className="text-zinc-500 mb-3 text-[11px] leading-relaxed sm:text-[12px]"
             >
-              Enter envia • Shift + Enter permite nova linha • {draft.length}/{MAX_INPUT_CHARS}{" "}
-              caracteres
+              Enter envia mensagem ao assistente • Shift + Enter permite nova linha •{" "}
+              {draft.length}/{MAX_INPUT_CHARS}
+              caracteres. O botão PDF tenta primeiro pedir marcadores ao assistente a partir da
+              conversa; se essa chamada falhar, o arquivo traz apenas o texto da sessão.
             </p>
             <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <button
                 type="button"
-                onClick={handleDownloadSecurityPdf}
-                className="border-zinc-600/85 text-zinc-100 hover:bg-zinc-800/90 inline-flex items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-medium transition-colors"
+                onClick={() => {
+                  void handleAssistantPdfExport()
+                }}
+                disabled={chatBusyOrBlocking}
+                className="border-zinc-600/85 text-zinc-100 hover:bg-zinc-800/90 disabled:pointer-events-none disabled:opacity-50 inline-flex items-center justify-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-medium transition-colors"
               >
-                <FileDown className="size-4 shrink-0" aria-hidden />
-                Baixar PDF da situação
+                {pdfLoading ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                ) : (
+                  <FileDown className="size-4 shrink-0" aria-hidden />
+                )}
+                Gerar PDF do assistente
               </button>
               <button
-                type="button"
-                onClick={handleGenerateReport}
-                disabled={loading || draft.length > MAX_INPUT_CHARS}
+                type="submit"
+                disabled={disabledSubmit}
                 className={cn(
                   "hover:brightness-110 active:brightness-95 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-[13px] font-semibold text-zinc-950 shadow-lg transition-[filter]",
-                  loading || draft.length > MAX_INPUT_CHARS
+                  disabledSubmit
                     ? "cursor-not-allowed bg-zinc-600 text-zinc-400 opacity-75"
                     : "",
                 )}
-                style={
-                  loading || draft.length > MAX_INPUT_CHARS
-                    ? undefined
-                    : { backgroundColor: "#26C2D1" }
-                }
+                style={disabledSubmit ? undefined : { backgroundColor: "#26C2D1" }}
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="size-4 animate-spin text-zinc-950" aria-hidden />
-                    Aguarde…
+                    Aguardando o assistente…
                   </span>
                 ) : (
-                  "Gerar relatório"
+                  "Enviar ao assistente"
                 )}
               </button>
             </div>

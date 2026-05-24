@@ -1,4 +1,4 @@
-/** Caixa onde chegam mensagens vindas do formulário de contacto. */
+/** Caixa onde chegam mensagens vindas do formulário de contato. */
 export const CONTACT_DESTINATION_EMAIL = "copatrulha@gmail.com" as const
 
 /** Tag registada nos envios via Brevo para filtro / analytics. */

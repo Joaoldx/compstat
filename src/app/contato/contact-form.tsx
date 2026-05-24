@@ -35,7 +35,7 @@ async function submitContact(payload: {
     }
   } catch {
     if (!response.ok) {
-      message = `Servidor devolveu erro (${response.status}).`
+      message = `Servidor retornou erro (${response.status}).`
     }
   }
 
@@ -54,7 +54,7 @@ export function ContactForm() {
   const motivoErro =
     attemptedSubmit &&
     motivoCodigo.trim() === "" &&
-    "Selecione o motivo do contacto."
+    "Selecione o motivo do contato."
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -102,7 +102,7 @@ export function ContactForm() {
           className="border-border mb-6 rounded-lg border bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300"
           role="status"
         >
-          Mensagem enviada. Obrigado pelo contacto.
+          Mensagem enviada. Obrigado pelo contato.
         </p>
       ) : null}
 
@@ -141,7 +141,7 @@ export function ContactForm() {
 
         <div className="space-y-2">
           <label htmlFor="contato-motivo" className="text-sm font-medium">
-            Motivo do contacto
+            Motivo do contato
           </label>
           <select
             id="contato-motivo"
@@ -178,7 +178,7 @@ export function ContactForm() {
             onChange={(e) => setMensagem(e.target.value)}
             rows={6}
             className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none placeholder:text-muted-foreground flex min-h-32 w-full rounded-lg border px-3 py-2 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder="Descreva seu contacto em detalhes…"
+            placeholder="Descreva seu contato em detalhes…"
             disabled={isSubmitting}
             aria-invalid={
               showFieldErrors && mensagem.trim() === "" ? true : undefined
@@ -186,7 +186,7 @@ export function ContactForm() {
           />
           {showFieldErrors && mensagem.trim() === "" ? (
             <p className="text-destructive text-xs">
-              Escreva a mensagem do contacto.
+              Escreva a mensagem do contato.
             </p>
           ) : null}
         </div>

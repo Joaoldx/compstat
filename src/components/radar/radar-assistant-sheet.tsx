@@ -8,10 +8,17 @@ import { ChatbotDemoPanel } from "@/components/radar-rio/chatbot-demo-panel"
 type RadarAssistantSheetProps = Readonly<{
   open: boolean
   onOpenChange: (open: boolean) => void
+  onExportRadarPagePdf: () => void
+  radarPagePdfDisabled: boolean
 }>
 
 /** Assistência analista como cartão fixo próximo ao canto inferior direito — Radix Dialog (overlay fecha ao clicar, Escape fecha). */
-export function RadarAssistantSheet({ open, onOpenChange }: RadarAssistantSheetProps) {
+export function RadarAssistantSheet({
+  open,
+  onOpenChange,
+  onExportRadarPagePdf,
+  radarPagePdfDisabled,
+}: RadarAssistantSheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -41,7 +48,11 @@ export function RadarAssistantSheet({ open, onOpenChange }: RadarAssistantSheetP
             <X className="size-5" aria-hidden />
           </Dialog.Close>
 
-          <ChatbotDemoPanel className="min-h-0 flex-1" />
+          <ChatbotDemoPanel
+            className="min-h-0 flex-1"
+            onExportRadarPagePdf={onExportRadarPagePdf}
+            radarPagePdfDisabled={radarPagePdfDisabled}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

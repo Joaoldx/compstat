@@ -138,6 +138,62 @@
     }
 }
 
+/* Radar (MapLibre): estilos padrão forçam fundo claro no popup/controles — alinha ao tema `.dark`. */
+.dark [data-radar-map] .maplibregl-popup-content {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border-radius: var(--radius);
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.35),
+    0 4px 6px -4px rgb(0 0 0 / 0.35);
+}
+
+.dark [data-radar-map] .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.dark [data-radar-map] .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.dark [data-radar-map] .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--card);
+}
+.dark [data-radar-map] .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.dark [data-radar-map] .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.dark [data-radar-map] .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--card);
+}
+.dark [data-radar-map] .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--card);
+}
+.dark [data-radar-map] .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--card);
+}
+
+.dark [data-radar-map] .maplibregl-ctrl-group {
+  background: var(--card);
+}
+.dark [data-radar-map] .maplibregl-ctrl-group:not(:empty) {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+
+.dark [data-radar-map] .maplibregl-ctrl-group button + button {
+  border-top-color: var(--border);
+}
+
+.dark [data-radar-map] .maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+
+/* Liberty / basemaps lidos (“tinta escura sobre fundo claro”): suaviza luminosidade no tema .dark sem “vácuo preto”. */
+.dark [data-radar-map][data-radar-basemap-ink="light"]
+  .maplibregl-canvas-container
+  canvas.maplibregl-canvas {
+  filter: brightness(0.9) saturate(0.93) contrast(1.03);
+}
+
+/* Basemap efetivamente escuro (ex. Dark Matter): realça relevo/fronteiras no tema escuro da app */
+.dark [data-radar-map][data-radar-basemap-ink="dark"]
+  .maplibregl-canvas-container
+  canvas.maplibregl-canvas {
+  filter: brightness(1.24) saturate(1.08) contrast(1.05);
+}
+
 @media (prefers-reduced-motion: reduce) {
   @layer base {
     * {

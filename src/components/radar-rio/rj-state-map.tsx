@@ -11,6 +11,8 @@ import {
   useRef,
   useState,
 } from "react"
+
+import { useHtmlHasDarkClass } from "@/hooks/use-html-dark-class"
 import Map, { Layer, NavigationControl, Popup, Source } from "react-map-gl/maplibre"
 import type { MapLayerMouseEvent } from "maplibre-gl"
 import type { MapRef } from "react-map-gl/maplibre"
@@ -19,14 +21,19 @@ import {
   RADAR_MACRO_FILL_LAYER_ID,
   RADAR_MACRO_LINE_LAYER_ID,
   RADAR_MACRO_SOURCE_ID,
-  RADAR_MAP_DARK_STYLE_URL,
-  RADAR_MAP_LIGHT_STYLE_URL,
+  RADAR_MAP_DARK_STYLE_CASCADE,
+  RADAR_MAP_LIGHT_STYLE_CASCADE,
   RJ_ESTADO_FIT_BOUNDS,
   RJ_ESTADO_FIT_MAX_ZOOM,
   RJ_ESTADO_FIT_PADDING,
   RJ_ESTADO_INITIAL_VIEW,
   RJ_ESTADO_MAX_BOUNDS,
 } from "@/config/rj-estado-map"
+import { basemapUsesDarkInk } from "@/lib/radar/radar-basemap-contrast"
+import {
+  buildRadarTerritoryPdfDigest,
+  type RadarTerritoryPdfDigest,
+} from "@/lib/radar/build-radar-territory-pdf-digest"
 import type { RadarCrimeSeverity } from "@/lib/radar/load-radar-rj-crossed"
 import {
   fetchRadarRJCrosswalk,
@@ -39,6 +46,7 @@ import {
   type RadarTerritoryFiltersState,
 } from "@/lib/radar/radar-territory-filter"
 import { RADAR_RJ_MACROREGIOES_GEOJSON } from "@/data/radar-rio/mock-macroregions"
+import { useMapStyleWithNetworkFallback } from "@/hooks/use-map-style-with-network-fallback"
 import { cn } from "@/lib/utils"
 
 type RadarMapLayers = FeatureCollection<
@@ -51,7 +59,7 @@ type DataMode = "territorio" | "demo"
 type RadarLayerBriefStats = Readonly<{ total: number; visible: number }>
 
 export type RadarMapDataStatus = Readonly<{
-  /** À espera da resposta/leitura do CSV de territórios × ocorrências. */
+  /** Aguardando resposta ou leitura do CSV de territórios × ocorrências. */
   csvLoading: boolean
   /** Produção: CSV inválido ou indisponível e sem modo demo — o mapa interativo não abre. */
   csvFatalError: string | null
@@ -66,6 +74,8 @@ type RjStateMapProps = {
   onFilterCatalog?: (catalog: RadarFilterCatalog | null) => void
   /** Estado de dados para mensagens UX fora do mapa (ex.: filtros). */
   onMapDataStatus?: (status: RadarMapDataStatus) => void
+  /** Resumo leve das features visíveis para exportação PDF (sem geometrias). */
+  onTerritoryPdfDigest?: (digest: RadarTerritoryPdfDigest | null) => void
 }
 
 type RadarMacroHover = Readonly<{
@@ -247,10 +257,12 @@ export function RjStateMap({
   onLayerStats,
   onFilterCatalog,
   onMapDataStatus,
+  onTerritoryPdfDigest,
 }: RjStateMapProps) {
   const mapRef = useRef<MapRef>(null)
   const [hover, setHover] = useState<RadarMacroHover | null>(null)
   const { resolvedTheme } = useTheme()
+  const htmlDark = useHtmlHasDarkClass()
 
   const [layers, setLayers] = useState<RadarMapLayers | null>(null)
   const [dataMode, setDataMode] = useState<DataMode>("territorio")
@@ -284,6 +296,20 @@ export function RjStateMap({
       filters
     )
   }, [baseTerritoryFc, filters])
+
+  const territoryPdfDigest = useMemo((): RadarTerritoryPdfDigest | null => {
+    if (!baseTerritoryFc) return null
+    return buildRadarTerritoryPdfDigest({
+      dataMode,
+      featuresTotal: filteredPack.total,
+      featuresVisible: filteredPack.visible,
+      features: filteredPack.filtradas.features,
+    })
+  }, [baseTerritoryFc, dataMode, filteredPack])
+
+  useEffect(() => {
+    onTerritoryPdfDigest?.(territoryPdfDigest)
+  }, [onTerritoryPdfDigest, territoryPdfDigest])
 
   useEffect(() => {
     if (!onLayerStats) return
@@ -329,14 +355,28 @@ export function RjStateMap({
     }
   }, [csvUrl, allowDemoFallback])
 
-  const isDarkBasemap = resolvedTheme === "dark"
-  const mapStyleUrl = isDarkBasemap ? RADAR_MAP_DARK_STYLE_URL : RADAR_MAP_LIGHT_STYLE_URL
+  const isDarkBasemap = htmlDark || resolvedTheme === "dark"
+  const radarStyleCascade = isDarkBasemap
+    ? RADAR_MAP_DARK_STYLE_CASCADE
+    : RADAR_MAP_LIGHT_STYLE_CASCADE
+
+  const {
+    effectiveStyleUrl,
+    onStyleLoadSuccess,
+    onStyleLoadError,
+    usingFallbackBasemap,
+    fallbackBasemapUserHint,
+  } = useMapStyleWithNetworkFallback(radarStyleCascade)
+
+  const macroInkIsDarkBasemap = basemapUsesDarkInk(effectiveStyleUrl)
 
   const macroLayers = useMemo(() => {
-    const outline = isDarkBasemap
-      ? "rgba(250, 250, 250, 0.12)"
-      : "rgba(30, 41, 59, 0.22)"
-    const lineColor = isDarkBasemap ? "rgba(250, 250, 250, 0.38)" : "rgba(30, 41, 59, 0.45)"
+    const outline = macroInkIsDarkBasemap
+      ? "rgba(255, 255, 255, 0.3)"
+      : "rgba(30, 41, 59, 0.26)"
+    const lineColor = macroInkIsDarkBasemap
+      ? "rgba(248, 250, 252, 0.62)"
+      : "rgba(30, 41, 59, 0.5)"
 
     const fillPaint = {
       "fill-color": [...MACRO_FILL_MATCH],
@@ -346,7 +386,7 @@ export function RjStateMap({
 
     const linePaint = {
       "line-color": lineColor,
-      "line-width": 1.35,
+      "line-width": macroInkIsDarkBasemap ? 1.6 : 1.35,
     }
 
     const fillLayer = {
@@ -364,7 +404,7 @@ export function RjStateMap({
     }
 
     return { fillLayer, lineLayer }
-  }, [isDarkBasemap])
+  }, [macroInkIsDarkBasemap])
 
   const applyStateBounds = useCallback(() => {
     const raw = mapRef.current?.getMap()
@@ -431,6 +471,8 @@ export function RjStateMap({
 
   return (
     <div
+      data-radar-basemap-ink={macroInkIsDarkBasemap ? "dark" : "light"}
+      data-radar-map
       className={cn(
         "relative isolate flex h-full min-h-[400px] w-full min-w-0 flex-1 flex-col",
         className
@@ -438,9 +480,9 @@ export function RjStateMap({
     >
       <div className="relative h-full min-h-[400px] min-w-0 flex-1">
         <Map
-          key={mapStyleUrl}
+          key={effectiveStyleUrl}
           ref={mapRef}
-          mapStyle={mapStyleUrl}
+          mapStyle={effectiveStyleUrl}
           reuseMaps
           initialViewState={RJ_ESTADO_INITIAL_VIEW}
           maxBounds={RJ_ESTADO_MAX_BOUNDS}
@@ -453,11 +495,13 @@ export function RjStateMap({
           onMouseMove={onMove}
           onMouseLeave={onLeave}
           onLoad={() => {
+            onStyleLoadSuccess()
             applyStateBounds()
             requestAnimationFrame(() => {
               mapRef.current?.resize()
             })
           }}
+          onError={onStyleLoadError}
         >
           <Source data={displayLayersFiltered} id={RADAR_MACRO_SOURCE_ID} type="geojson">
             <Layer {...macroLayers.fillLayer} />
@@ -483,6 +527,20 @@ export function RjStateMap({
           />
         </Map>
       </div>
+
+      {usingFallbackBasemap ? (
+        <div className="absolute top-3 right-3 z-20 md:left-[13.5rem] md:right-auto">
+          <span
+            role="note"
+            className="bg-background/90 hover:bg-accent/40 border-border hover:border-border cursor-help rounded-md border px-2 py-1 text-[10px] leading-snug text-muted-foreground shadow-sm ring-1 ring-border backdrop-blur-sm"
+            tabIndex={0}
+            aria-label={fallbackBasemapUserHint}
+            title={fallbackBasemapUserHint}
+          >
+            Mapa base (reserva)
+          </span>
+        </div>
+      ) : null}
 
       <div className="pointer-events-none absolute top-3 left-3 z-10 max-w-[180px] text-[10px] leading-snug text-muted-foreground">
         <div className="bg-background/90 rounded-lg border border-border px-2.5 py-2 shadow-sm ring-1 ring-border backdrop-blur-sm">

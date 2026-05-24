@@ -38,7 +38,7 @@ function badRequest(message: string) {
 }
 
 function normalizeMessages(raw: unknown): NormalizedChatMessage[] | string {
-  if (!Array.isArray(raw)) return "O campo «messages» tem de ser uma lista."
+  if (!Array.isArray(raw)) return 'O campo "messages" deve ser uma lista.'
 
   if (raw.length === 0) return "É necessário pelo menos uma mensagem."
   if (raw.length > MAX_MESSAGES) {
@@ -49,7 +49,7 @@ function normalizeMessages(raw: unknown): NormalizedChatMessage[] | string {
 
   for (const item of raw) {
     if (typeof item !== "object" || item === null) {
-      return "Cada mensagem tem de ser um objeto válido."
+      return "Cada mensagem precisa ser um objeto válido."
     }
     const m = item as IncomingMessage
 
@@ -57,10 +57,10 @@ function normalizeMessages(raw: unknown): NormalizedChatMessage[] | string {
     const contentRaw = m.content
 
     if (roleRaw !== "user" && roleRaw !== "assistant" && roleRaw !== "system") {
-      return 'Cada mensagem deve ter «role»: «user», «assistant» ou «system».'
+      return 'Cada mensagem deve informar role: "user", "assistant" ou "system".'
     }
     if (typeof contentRaw !== "string") {
-      return 'Cada mensagem deve ter «content» em texto.'
+      return 'Cada mensagem deve ter o campo "content" em texto.'
     }
 
     const content = contentRaw.trim()
@@ -81,9 +81,41 @@ function normalizeMessages(raw: unknown): NormalizedChatMessage[] | string {
   return normalized
 }
 
+/**
+ * Alguns gateways devolvem `message.content` como string; outros como lista de fragmentos texto.
+ */
+function normalizeAssistantChoiceContent(raw: unknown): string {
+  if (typeof raw === "string") {
+    return raw.trim()
+  }
+
+  if (!Array.isArray(raw)) {
+    return ""
+  }
+
+  const chunks: string[] = []
+
+  for (const item of raw) {
+    if (typeof item === "string") {
+      chunks.push(item)
+      continue
+    }
+
+    if (item !== null && typeof item === "object") {
+      const fragment = item as Record<string, unknown>
+      const textFragment = fragment.text
+      if (typeof textFragment === "string") {
+        chunks.push(textFragment)
+      }
+    }
+  }
+
+  return chunks.join("").trim()
+}
+
 type OpenRouterChatResponse = Readonly<{
   choices?: ReadonlyArray<{
-    message?: Readonly<{ content?: string | null }>
+    message?: Readonly<{ content?: unknown }>
   }>
   error?: Readonly<{ message?: string; code?: number }>
 }>
@@ -140,7 +172,7 @@ export async function POST(request: Request) {
     body = await request.json()
   } catch {
     return NextResponse.json(
-      { error: "Pedido JSON inválido ou corpo em falta." },
+      { error: "Pedido JSON inválido ou corpo ausente." },
       { status: 400 },
     )
   }
@@ -200,14 +232,14 @@ export async function POST(request: Request) {
     )
   }
 
-  const contentRaw = parsed.choices?.[0]?.message?.content
-  const content =
-    typeof contentRaw === "string" ? contentRaw.trim() : ""
+  const content = normalizeAssistantChoiceContent(
+    parsed.choices?.[0]?.message?.content,
+  )
 
   if (!content) {
     return NextResponse.json(
       {
-        error: "A IA devolveu uma resposta vazia. Tente reformular a pergunta.",
+        error: "A IA retornou uma resposta vazia. Tente reformular a pergunta.",
       },
       { status: 502 },
     )

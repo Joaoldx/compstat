@@ -1,4 +1,4 @@
-/** Estilo vetorial neutro (claro); troca futura pode depender do tema da app. */
+/** Estilo vetorial neutro claro (Carto Positron). Falhas de CDN são tratadas no cliente pelo estilo de reserva em `src/config/maplibre-style-fallback.ts`. */
 export const MAP_BASE_STYLE_URL =
   "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
 

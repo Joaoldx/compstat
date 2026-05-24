@@ -37,7 +37,7 @@ export async function sendBrevoTransactionalEmail(
   const apiKey = process.env.BREVO_API_KEY?.trim()
   if (!apiKey) {
     throw new Error(
-      "Configuração em falta: defina a variável de ambiente BREVO_API_KEY."
+      "Falta de configuração: defina a variável de ambiente BREVO_API_KEY."
     )
   }
 
@@ -81,7 +81,7 @@ export function buildContactFormBrevoPayload(args: {
     mensagem,
   } = args
 
-  const subject = `CoPatrulha — contacto (${motivoLabel})`
+  const subject = `CoPatrulha — contato (${motivoLabel})`
   const textContent = [
     `Nome: ${nome}`,
     `Motivo: ${motivoLabel}`,

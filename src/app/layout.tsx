@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: "CoPatrulha",
+  description:
+    "Protótipo de inteligência criminal para o Rio: mapas territoriais, Radar com assistente analista e relatórios de apoio à decisão.",
   icons: {
     icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
   },

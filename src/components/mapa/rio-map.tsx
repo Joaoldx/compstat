@@ -15,6 +15,7 @@ import {
   TERRITORIOS_MAP_MAX_ZOOM,
   TERRITORIOS_SOURCE_ID,
 } from "@/config/mapa"
+import { useMapStyleWithNetworkFallback } from "@/hooks/use-map-style-with-network-fallback"
 import { useTerritoriosGeoJson } from "@/hooks/use-territorios-geojson"
 import { boundsFromTerritoriosCollection } from "@/lib/geo/polygon-feature-collection-bounds"
 import type { TerritoriosFeatureCollection } from "@/lib/parse-territorio-csv"
@@ -103,12 +104,20 @@ function MapStatus({
   )
 }
 
-/** MapLibre interactivo dos domínios territoriais (RJ). */
+/** MapLibre interativo dos domínios territoriais (RJ). */
 export function RioMap({ className }: { className?: string }) {
   const loadState = useTerritoriosGeoJson()
   const mapRef = useRef<MapRef>(null)
   const [mapReady, setMapReady] = useState(false)
   const [hover, setHover] = useState<TerritorioHoverInfo | null>(null)
+
+  const {
+    effectiveStyleUrl,
+    onStyleLoadSuccess,
+    onStyleLoadError,
+    usingFallbackBasemap,
+    fallbackBasemapUserHint,
+  } = useMapStyleWithNetworkFallback(MAP_BASE_STYLE_URL)
 
   const geojson: TerritoriosFeatureCollection | null =
     loadState.status === "ready" ? loadState.data : null
@@ -141,7 +150,7 @@ export function RioMap({ className }: { className?: string }) {
   if (loadState.status === "loading") {
     return (
       <div className={wrapperClass}>
-        <MapStatus message="A carregar mapa…" variant="muted" />
+        <MapStatus message="Carregando mapa…" variant="muted" />
       </div>
     )
   }
@@ -169,16 +178,35 @@ export function RioMap({ className }: { className?: string }) {
 
   return (
     <div className={wrapperClass}>
+      {usingFallbackBasemap ? (
+        <div className="absolute top-3 right-3 z-10 md:left-auto">
+          <span
+            role="note"
+            className="bg-background text-foreground hover:bg-accent/35 border-border cursor-help rounded-md border px-2 py-1 text-xs leading-snug shadow-sm"
+            tabIndex={0}
+            aria-label={fallbackBasemapUserHint}
+            title={fallbackBasemapUserHint}
+          >
+            Mapa base (reserva)
+          </span>
+        </div>
+      ) : null}
+
       <Map
+        key={effectiveStyleUrl}
         ref={mapRef}
         cursor={hover ? "pointer" : "grab"}
         initialViewState={RIO_INITIAL_VIEW}
         interactiveLayerIds={[TERRITORIOS_LAYER_IDS.fill]}
-        mapStyle={MAP_BASE_STYLE_URL}
+        mapStyle={effectiveStyleUrl}
         maxPitch={0}
         style={{ width: "100%", height: "100%" }}
         reuseMaps
-        onLoad={() => setMapReady(true)}
+        onLoad={() => {
+          onStyleLoadSuccess()
+          setMapReady(true)
+        }}
+        onError={onStyleLoadError}
         onMouseLeave={onMouseLeave}
         onMouseMove={onMouseMove}
       >

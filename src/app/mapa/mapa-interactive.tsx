@@ -9,7 +9,7 @@ const RioMapDynamic = dynamic(
     ssr: false,
     loading: () => (
       <div className="text-muted-foreground flex min-h-[50vh] w-full items-center justify-center rounded-lg border bg-muted/40 text-sm">
-        A inicializar mapa…
+        Inicializando mapa…
       </div>
     ),
   }

@@ -1,5 +1,7 @@
 "use client"
 
+import type { ReactNode } from "react"
+
 import type { RadarCrimeSeverity } from "@/lib/radar/load-radar-rj-crossed"
 import {
   defaultRadarTerritoryFilters,
@@ -27,6 +29,8 @@ type RadarTerritoryFiltersPanelProps = Readonly<{
   csvLoading: boolean
   /** Produção: falha grave sem modo demo — o mapa não abre e o painel fica apenas informativo. */
   csvFatalError: string | null
+  /** Conteúdos à direita do título — ex.: botão "Gerar relatório" (PDF do mapa). */
+  toolbarExtra?: ReactNode
 }>
 
 export function RadarTerritoryFiltersPanel({
@@ -36,6 +40,7 @@ export function RadarTerritoryFiltersPanel({
   stats,
   csvLoading,
   csvFatalError,
+  toolbarExtra,
 }: RadarTerritoryFiltersPanelProps) {
   const paneDisabled = Boolean(csvFatalError)
   const atualizarCampo = <K extends keyof RadarTerritoryFiltersState>(
@@ -88,24 +93,27 @@ export function RadarTerritoryFiltersPanel({
             passam nos filtros.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={paneDisabled}
-          onClick={() => {
-            const d = defaultRadarTerritoryFilters()
-            onChange({
-              ...d,
-              anoMin: catalog?.yearMin ?? d.anoMin,
-              anoMax: catalog?.yearMax ?? d.anoMax,
-            })
-          }}
-          className={cn(
-            "shrink-0 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium transition",
-            "hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
-          )}
-        >
-          Limpar filtros
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {toolbarExtra ?? null}
+          <button
+            type="button"
+            disabled={paneDisabled}
+            onClick={() => {
+              const d = defaultRadarTerritoryFilters()
+              onChange({
+                ...d,
+                anoMin: catalog?.yearMin ?? d.anoMin,
+                anoMax: catalog?.yearMax ?? d.anoMax,
+              })
+            }}
+            className={cn(
+              "shrink-0 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium transition",
+              "hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+            )}
+          >
+            Limpar filtros
+          </button>
+        </div>
       </header>
 
       {paneDisabled ? (
@@ -135,9 +143,9 @@ export function RadarTerritoryFiltersPanel({
             className="mt-4 rounded-xl border border-sky-500/35 bg-sky-500/[0.07] px-4 py-3 text-[11px] leading-relaxed text-muted-foreground shadow-sm dark:border-sky-400/25 dark:bg-sky-950/35"
           >
             <span className="font-semibold text-foreground">
-              A carregar o CSV público…
+              Carregando o CSV público…
             </span>{" "}
-            Já pode usar o campo de texto e os níveis de prioridade enquanto o mapa
+            Você já pode usar o campo de texto e os níveis de prioridade enquanto o mapa
             constrói o catálogo. Domínio OCRIM, faixa de anos e lista completa de
             delitos ativam automaticamente assim que os dados ficarem disponíveis.
           </div>

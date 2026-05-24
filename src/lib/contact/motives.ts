@@ -1,4 +1,4 @@
-/** Opções partilhadas entre o formulário no cliente e a validação na API. */
+/** Opções compartilhadas entre o formulário no cliente e a validação na API. */
 
 export type ContactMotiveCode =
   | "duvida"

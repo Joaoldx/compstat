@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     body = (await request.json()) as ContactPayload
   } catch {
     return NextResponse.json(
-      { error: "Pedido JSON inválido ou corpo em falta." },
+      { error: "Pedido JSON inválido ou corpo ausente." },
       { status: 400 }
     )
   }
@@ -46,11 +46,11 @@ export async function POST(request: Request) {
     return badRequest("Nome é obrigatório.")
   }
   if (nome.length > MAX_NOME_LENGTH) {
-    return badRequest(`Nome demasiado longo (máx. ${MAX_NOME_LENGTH} caracteres).`)
+    return badRequest(`Nome muito longo (máx. ${MAX_NOME_LENGTH} caracteres).`)
   }
 
   if (!isContactMotiveCode(motivoCode)) {
-    return badRequest("Motivo do contacto inválido.")
+    return badRequest("Motivo do contato inválido.")
   }
 
   if (!mensagem.length) {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   }
   if (mensagem.length > MAX_MENSAGEM_LENGTH) {
     return badRequest(
-      `Mensagem demasiado longa (máx. ${MAX_MENSAGEM_LENGTH} caracteres).`
+      `Mensagem muito longa (máx. ${MAX_MENSAGEM_LENGTH} caracteres).`
     )
   }
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "O servidor não está configurado para enviar e-mail. Contacte o administrador.",
+          "O servidor não está configurado para enviar e-mail. Entre em contato com o administrador.",
       },
       { status: 503 }
     )

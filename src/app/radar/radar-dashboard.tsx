@@ -1,12 +1,14 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { Bot } from "lucide-react"
+import { Bot, FileDown } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { RadarAssistantSheet } from "@/components/radar/radar-assistant-sheet"
 import type { RadarMapDataStatus } from "@/components/radar-rio/rj-state-map"
 import { RadarTerritoryFiltersPanel } from "@/components/radar-rio/radar-territory-filters"
+import type { RadarTerritoryPdfDigest } from "@/lib/radar/build-radar-territory-pdf-digest"
+import { downloadRadarPagePdf } from "@/lib/radar/generate-radar-page-pdf"
 import {
   defaultRadarTerritoryFilters,
   type RadarFilterCatalog,
@@ -45,6 +47,8 @@ export function RadarDashboard() {
     csvLoading: true,
     csvFatalError: null,
   }))
+  const territoryPdfDigestRef = useRef<RadarTerritoryPdfDigest | null>(null)
+
   /** Aplica a faixa de anos do CSV uma vez quando o catálogo chega */
   const syncAnoDosDadosCarregadosRef = useRef(false)
 
@@ -62,6 +66,21 @@ export function RadarDashboard() {
     }))
   }, [catalog])
 
+  const onTerritoryPdfDigest = useCallback((digest: RadarTerritoryPdfDigest | null) => {
+    territoryPdfDigestRef.current = digest
+  }, [])
+
+  const handleExportRadarPagePdf = useCallback(() => {
+    downloadRadarPagePdf({
+      filters,
+      catalog,
+      territoryDigest: territoryPdfDigestRef.current,
+    })
+  }, [catalog, filters])
+
+  const radarReportDisabled =
+    mapDataStatus.csvFatalError !== null || mapDataStatus.csvLoading
+
   return (
     <div className="relative flex min-h-[calc(100dvh-3.5rem)] flex-col bg-background px-4 py-6 text-foreground md:px-8 md:py-8">
       <header className="mx-auto w-full max-w-6xl text-center lg:text-left">
@@ -71,18 +90,15 @@ export function RadarDashboard() {
             Rio
           </span>
         </h1>
-        <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground lg:mx-0">
-          Vista do Estado do RJ com polígonos de território (OCRIM) e registros de
-          ocorrências cujo ponto geométrico cai dentro de cada área — agregações por ano
-          e delito predominante vêm do ficheiro CSV gerado pelo script{" "}
-          <code className="rounded bg-muted px-1 py-px text-xs">
-            npm run radar:crossed
-          </code>
-          . Os controles para filtrar território ficam{" "}
-          <span className="font-medium text-foreground">
-            sempre abaixo do mapa nesta página
-          </span>
-          ; pode ser necessário percorrer a página um pouco se o seu ecrã for baixo.
+        <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground lg:mx-0">
+          Esta página apoia o raciocínio territorial no Estado do Rio: no mapa, você enxerga onde
+          se desenham os polígonos de referência e como se acumulam, ano a ano e por área, as ocorrências
+          cuja georreferência coincide com esse recorte — útil antes de decisões ou reuniões rápidas.
+          Você pode explorar combinando filtros (sempre abaixo do mapa), gerar um PDF com o que está visível
+          quando precisa registrar ou dar apoio textual, ou abrir o assistente para detalhar o cenário
+          atual. Além das contagens, há agregações já calculadas, como o delito predominante por recorte
+          territorial. Em telas menores, pode ser preciso rolar um pouco a página para acessar todos os
+          controles do mapa.
         </p>
       </header>
 
@@ -94,6 +110,7 @@ export function RadarDashboard() {
             onFilterCatalog={setCatalog}
             onLayerStats={setLayerStats}
             onMapDataStatus={setMapDataStatus}
+            onTerritoryPdfDigest={onTerritoryPdfDigest}
           />
         </div>
 
@@ -105,6 +122,21 @@ export function RadarDashboard() {
             filters={filters}
             stats={layerStats}
             onChange={setFilters}
+            toolbarExtra={
+              <button
+                type="button"
+                disabled={radarReportDisabled}
+                onClick={handleExportRadarPagePdf}
+                title="Exportar filtros atuais e territórios visíveis em PDF"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg border border-primary/35 bg-background/95 px-3 py-1.5 text-xs font-medium text-primary",
+                  "hover:bg-muted/85 disabled:pointer-events-none disabled:opacity-50",
+                )}
+              >
+                <FileDown className="size-3.5 shrink-0" aria-hidden />
+                Gerar relatório
+              </button>
+            }
           />
         </div>
 
@@ -122,12 +154,18 @@ export function RadarDashboard() {
         </button>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground lg:text-left">
-          Conteúdo meramente ilustrativo — o assistente só envia o texto da conversa ao
-          servidor para gerar uma resposta; não enviamos filtros do mapa automaticamente.
+          Conteúdo meramente ilustrativo — o PDF &quot;Gerar relatório&quot; usa só os filtros e o estado
+          do mapa neste navegador; o assistente continua isolado até você escrever no painel da
+          conversa e enviar cada pedido ao servidor.
         </p>
       </div>
 
-      <RadarAssistantSheet open={assistOpen} onOpenChange={setAssistOpen} />
+      <RadarAssistantSheet
+        open={assistOpen}
+        onOpenChange={setAssistOpen}
+        onExportRadarPagePdf={handleExportRadarPagePdf}
+        radarPagePdfDisabled={radarReportDisabled}
+      />
     </div>
   )
 }
