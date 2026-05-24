@@ -1,21 +1,23 @@
-# Next.js template
+# Desafio Impact Lab | CoPatrulha
 
-This is a Next.js template with shadcn/ui.
+Time composto por:
 
-## Adding components
+João Domingos [Linkedin](https://www.linkedin.com/in/joaoldomingos/)
 
-To add components to your app, run the following command:
+Estéfany Rocha [Linkedin](https://www.linkedin.com/in/estefanyrocha/)
+
+Leandro Aveiro [Linkedin](https://www.linkedin.com/in/leandro-aveiro/)
+
+Leonardo Maciel [Linkedin](https://www.linkedin.com/in/vinicius-ribeiro-ms)
+
+Vinicius Machado [Linkedin](https://www.linkedin.com/in/leonardo-s-antunes-maciel-a4358ba0/)
+
+Instruções para executar o projeto
 
 ```bash
-npx shadcn@latest add button
+npm install
 ```
 
-This will place the ui components in the `components` directory.
-
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
+```bash
+npm run dev
 ```
