@@ -4,7 +4,13 @@ import "maplibre-gl/dist/maplibre-gl.css"
 
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson"
 import { useTheme } from "next-themes"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import Map, { Layer, NavigationControl, Popup, Source } from "react-map-gl/maplibre"
 import type { MapLayerMouseEvent } from "maplibre-gl"
 import type { MapRef } from "react-map-gl/maplibre"
@@ -26,6 +32,12 @@ import {
   fetchRadarRJCrosswalk,
   RADAR_RJ_CROSSED_CSV_URL,
 } from "@/lib/radar/load-radar-rj-crossed"
+import {
+  aplicarRadarTerritoryFiltersToFeatureCollection,
+  buildRadarFilterCatalog,
+  type RadarFilterCatalog,
+  type RadarTerritoryFiltersState,
+} from "@/lib/radar/radar-territory-filter"
 import { RADAR_RJ_MACROREGIOES_GEOJSON } from "@/data/radar-rio/mock-macroregions"
 import { cn } from "@/lib/utils"
 
@@ -36,10 +48,24 @@ type RadarMapLayers = FeatureCollection<
 
 type DataMode = "territorio" | "demo"
 
+type RadarLayerBriefStats = Readonly<{ total: number; visible: number }>
+
+export type RadarMapDataStatus = Readonly<{
+  /** À espera da resposta/leitura do CSV de territórios × ocorrências. */
+  csvLoading: boolean
+  /** Produção: CSV inválido ou indisponível e sem modo demo — o mapa interativo não abre. */
+  csvFatalError: string | null
+}>
+
 type RjStateMapProps = {
   className?: string
   /** Origem CSV (defaults `RADAR_RJ_CROSSED_CSV_URL`). */
   csvUrl?: string
+  filters: RadarTerritoryFiltersState
+  onLayerStats?: (stats: RadarLayerBriefStats) => void
+  onFilterCatalog?: (catalog: RadarFilterCatalog | null) => void
+  /** Estado de dados para mensagens UX fora do mapa (ex.: filtros). */
+  onMapDataStatus?: (status: RadarMapDataStatus) => void
 }
 
 type RadarMacroHover = Readonly<{
@@ -208,10 +234,19 @@ function MacroPopup({
   )
 }
 
+const EMPTY_FEATURES: RadarMapLayers = {
+  type: "FeatureCollection",
+  features: [],
+}
+
 /** MapLibre: Estado do RJ — polígonos de território + ocorrências agregadas (CSV) ou modo demo. */
 export function RjStateMap({
   className,
   csvUrl = RADAR_RJ_CROSSED_CSV_URL,
+  filters,
+  onLayerStats,
+  onFilterCatalog,
+  onMapDataStatus,
 }: RjStateMapProps) {
   const mapRef = useRef<MapRef>(null)
   const [hover, setHover] = useState<RadarMacroHover | null>(null)
@@ -228,10 +263,42 @@ export function RjStateMap({
   const nivelPopupLabels =
     dataMode === "demo" ? NIVEL_LABEL_POPUP_DEMO : NIVEL_LABEL_POPUP_TERRITORIO
 
-  const displayLayers = useMemo<RadarMapLayers>(() => {
-    if (layers) return layers
-    return RADAR_RJ_MACROREGIOES_GEOJSON as RadarMapLayers
-  }, [layers])
+  /** Camada GeoJSON já carregada (CSV válido ou grelha demo). Antes da carga inicial = null. */
+  const baseTerritoryFc = layers
+
+  const filterCatalog = useMemo(() => {
+    if (!baseTerritoryFc) return null
+    return buildRadarFilterCatalog(baseTerritoryFc)
+  }, [baseTerritoryFc])
+
+  useEffect(() => {
+    onFilterCatalog?.(filterCatalog ?? null)
+  }, [filterCatalog, onFilterCatalog])
+
+  const filteredPack = useMemo(() => {
+    if (!baseTerritoryFc) {
+      return { filtradas: EMPTY_FEATURES, total: 0, visible: 0 }
+    }
+    return aplicarRadarTerritoryFiltersToFeatureCollection(
+      baseTerritoryFc,
+      filters
+    )
+  }, [baseTerritoryFc, filters])
+
+  useEffect(() => {
+    if (!onLayerStats) return
+    onLayerStats({
+      total: filteredPack.total,
+      visible: filteredPack.visible,
+    })
+  }, [filteredPack, onLayerStats])
+
+  /** Features efetivamente desenhadas (respeita filtros do painel). */
+  const displayLayersFiltered = filteredPack.filtradas as RadarMapLayers
+
+  useEffect(() => {
+    setHover(null)
+  }, [displayLayersFiltered])
 
   useEffect(() => {
     let cancel = false
@@ -320,6 +387,21 @@ export function RjStateMap({
   const stillLoadingTerritorio =
     layers === null && dataMode !== "demo" && loadErrorMessage === null
 
+  const failedProdWithoutLayers =
+    Boolean(loadErrorMessage) && layers === null && !allowDemoFallback
+
+  useEffect(() => {
+    onMapDataStatus?.({
+      csvLoading: stillLoadingTerritorio,
+      csvFatalError: failedProdWithoutLayers ? loadErrorMessage : null,
+    })
+  }, [
+    failedProdWithoutLayers,
+    loadErrorMessage,
+    onMapDataStatus,
+    stillLoadingTerritorio,
+  ])
+
   if (stillLoadingTerritorio) {
     return (
       <div
@@ -332,10 +414,6 @@ export function RjStateMap({
       </div>
     )
   }
-
-  /** Produção sem demo: falhou e não há camada substituta. */
-  const failedProdWithoutLayers =
-    loadErrorMessage && layers === null && !allowDemoFallback
 
   if (failedProdWithoutLayers) {
     return (
@@ -381,7 +459,7 @@ export function RjStateMap({
             })
           }}
         >
-          <Source data={displayLayers} id={RADAR_MACRO_SOURCE_ID} type="geojson">
+          <Source data={displayLayersFiltered} id={RADAR_MACRO_SOURCE_ID} type="geojson">
             <Layer {...macroLayers.fillLayer} />
             <Layer {...macroLayers.lineLayer} />
           </Source>

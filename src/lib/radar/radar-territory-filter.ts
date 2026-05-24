@@ -246,7 +246,7 @@ export function buildRadarFilterCatalog<Props extends GeoJsonProperties>(
   }
 }
 
-function somaOcurrenciasPorAnos(
+export function somaOcurrenciasPorAnos(
   anos: Record<number, number>,
   minY: number,
   maxY: number

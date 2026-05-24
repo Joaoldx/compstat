@@ -2,6 +2,7 @@
 
 import type { RadarCrimeSeverity } from "@/lib/radar/load-radar-rj-crossed"
 import {
+  defaultRadarTerritoryFilters,
   RADAR_FILTROS_NIVEIS_TODOS,
   type RadarFilterCatalog,
   type RadarTerritoryFiltersState,
@@ -22,7 +23,10 @@ type RadarTerritoryFiltersPanelProps = Readonly<{
   filters: RadarTerritoryFiltersState
   onChange: (next: RadarTerritoryFiltersState) => void
   stats: RadarLayerStats
-  disabled?: boolean
+  /** Carregamento do CSV público pelo mapa — mostra estado sem esconder o painel. */
+  csvLoading: boolean
+  /** Produção: falha grave sem modo demo — o mapa não abre e o painel fica apenas informativo. */
+  csvFatalError: string | null
 }>
 
 export function RadarTerritoryFiltersPanel({
@@ -30,8 +34,10 @@ export function RadarTerritoryFiltersPanel({
   filters,
   onChange,
   stats,
-  disabled,
+  csvLoading,
+  csvFatalError,
 }: RadarTerritoryFiltersPanelProps) {
+  const paneDisabled = Boolean(csvFatalError)
   const atualizarCampo = <K extends keyof RadarTerritoryFiltersState>(
     campo: K,
     valor: RadarTerritoryFiltersState[K]
@@ -44,16 +50,31 @@ export function RadarTerritoryFiltersPanel({
     !(catalog.yearMax >= catalog.yearMin)
 
   const dominioDesativado =
-    disabled || !catalog?.hasDominioOrcrimColumn || catalog.dominios.length === 0
+    paneDisabled ||
+    catalog === null ||
+    !catalog.hasDominioOrcrimColumn ||
+    catalog.dominios.length === 0
+
+  const delitosSelectOcioso =
+    paneDisabled ||
+    catalog === null ||
+    (catalog.delitos?.length ?? 0) <= 1
 
   const filtrosVaciosTodos =
-    stats.total > 0 && stats.visible === 0 && !disabled
+    stats.total > 0 && stats.visible === 0 && !paneDisabled
+
+  const showDominioAusentePorFonte =
+    catalog !== null && !catalog.hasDominioOrcrimColumn
+
+  const showAjudaAoCarregarGeral = !paneDisabled && csvLoading
 
   return (
     <section
+      id="radar-filtros"
       className={cn(
         "rounded-2xl border border-border bg-card/90 p-4 shadow-sm ring-1 ring-border",
-        "text-foreground backdrop-blur-sm md:p-5"
+        "text-foreground backdrop-blur-sm md:p-5",
+        paneDisabled && "opacity-95"
       )}
       aria-label="Filtros do mapa territorial"
     >
@@ -69,23 +90,15 @@ export function RadarTerritoryFiltersPanel({
         </div>
         <button
           type="button"
-          disabled={disabled}
-          onClick={() =>
+          disabled={paneDisabled}
+          onClick={() => {
+            const d = defaultRadarTerritoryFilters()
             onChange({
-              textoTerritorio: "",
-              dominioOrcrim: "",
-              niveis: [...RADAR_FILTROS_NIVEIS_TODOS],
-              anoMin:
-                catalog?.yearMin ??
-                catalog?.yearMax ??
-                new Date().getFullYear(),
-              anoMax:
-                catalog?.yearMax ??
-                catalog?.yearMin ??
-                new Date().getFullYear(),
-              delitoSeleccionCod: "",
+              ...d,
+              anoMin: catalog?.yearMin ?? d.anoMin,
+              anoMax: catalog?.yearMax ?? d.anoMax,
             })
-          }
+          }}
           className={cn(
             "shrink-0 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-medium transition",
             "hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
@@ -95,6 +108,49 @@ export function RadarTerritoryFiltersPanel({
         </button>
       </header>
 
+      {paneDisabled ? (
+        <div
+          role="alert"
+          className={cn(
+            "mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          )}
+        >
+          <p className="leading-snug font-medium">
+            O mapa não carregou neste ambiente, por isso não é possível filtrar
+            polígonos agora (não há catálogo a partir do CSV).
+          </p>
+          {csvFatalError ? (
+            <p className="text-muted-foreground mt-3 text-[11px] leading-relaxed tracking-wide dark:text-muted-foreground/95">
+              Detalhes técnicos:{" "}
+              <span className="break-words font-medium text-foreground">
+                {csvFatalError}
+              </span>
+            </p>
+          ) : null}
+        </div>
+      ) : showAjudaAoCarregarGeral ? (
+        <>
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-sky-500/35 bg-sky-500/[0.07] px-4 py-3 text-[11px] leading-relaxed text-muted-foreground shadow-sm dark:border-sky-400/25 dark:bg-sky-950/35"
+          >
+            <span className="font-semibold text-foreground">
+              A carregar o CSV público…
+            </span>{" "}
+            Já pode usar o campo de texto e os níveis de prioridade enquanto o mapa
+            constrói o catálogo. Domínio OCRIM, faixa de anos e lista completa de
+            delitos ativam automaticamente assim que os dados ficarem disponíveis.
+          </div>
+          <div className="mt-4 animate-pulse rounded-xl border border-dashed border-border/80 bg-muted/20 p-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="h-14 rounded-lg bg-muted" />
+              <div className="h-14 rounded-lg bg-muted" />
+              <div className="h-14 rounded-lg bg-muted sm:col-span-1" />
+            </div>
+          </div>
+        </>
+      ) : null}
+
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-12 lg:gap-x-6 lg:gap-y-5">
         <label className="flex flex-col gap-1 lg:col-span-4">
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -103,7 +159,7 @@ export function RadarTerritoryFiltersPanel({
           <input
             type="search"
             value={filters.textoTerritorio}
-            disabled={disabled}
+            disabled={paneDisabled}
             onChange={(e) =>
               atualizarCampo("textoTerritorio", e.target.value)
             }
@@ -111,7 +167,7 @@ export function RadarTerritoryFiltersPanel({
             className={cn(
               "rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-sky-500/30",
               "placeholder:text-muted-foreground/70 focus-visible:ring-4",
-              disabled && "opacity-50"
+              paneDisabled && "opacity-50"
             )}
           />
         </label>
@@ -148,9 +204,13 @@ export function RadarTerritoryFiltersPanel({
               </option>
             ))}
           </select>
-          {!catalog?.hasDominioOrcrimColumn ? (
+          {showDominioAusentePorFonte ? (
             <span className="text-[10px] text-muted-foreground">
               Indisponível nesta fonte de dados simulados.
+            </span>
+          ) : showAjudaAoCarregarGeral ? (
+            <span className="text-[10px] text-muted-foreground">
+              Lista de domínios preenchida assim que o mapa ler o CSV.
             </span>
           ) : null}
         </label>
@@ -160,35 +220,39 @@ export function RadarTerritoryFiltersPanel({
             Prioridade territorial
           </legend>
           <div className="mt-2 flex flex-wrap gap-3">
-            {RADAR_FILTROS_NIVEIS_TODOS.map((nv) => {
-              const marcado =
-                filtrosPorNivelCompleto ||
-                filters.niveis.some((x) => x === nv)
-              return (
-                <label
-                  key={nv}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground",
-                    disabled && "cursor-not-allowed opacity-50"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={marcado || filters.niveis.includes(nv)}
-                    disabled={disabled}
-                    className="size-4 rounded border-border accent-sky-500"
-                    onChange={(ev) =>
-                      filtrosPorNivelCompleto && !ev.target.checked
-                        ? alternarNivel(nv, false)
-                        : filtrosPorNivelCompleto && ev.target.checked
-                          ? seleccionarTodosNiveis()
-                          : alternarNivel(nv, ev.target.checked)
+            {RADAR_FILTROS_NIVEIS_TODOS.map((nv) => (
+              <label
+                key={nv}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground",
+                  paneDisabled && "cursor-not-allowed opacity-50"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={filters.niveis.includes(nv)}
+                  disabled={paneDisabled}
+                  className="size-4 rounded border-border accent-sky-500"
+                  onChange={(ev) => {
+                    const marcado = ev.target.checked
+                    if (marcado) {
+                      const setAtual = new Set<RadarCrimeSeverity>(filters.niveis)
+                      setAtual.add(nv)
+                      atualizarCampo(
+                        "niveis",
+                        RADAR_FILTROS_NIVEIS_TODOS.filter((x) => setAtual.has(x))
+                      )
+                    } else {
+                      atualizarCampo(
+                        "niveis",
+                        filters.niveis.filter((x) => x !== nv)
+                      )
                     }
-                  />
-                  <span>{NIVEL_LABELS[nv]}</span>
-                </label>
-              )
-            })}
+                  }}
+                />
+                <span>{NIVEL_LABELS[nv]}</span>
+              </label>
+            ))}
           </div>
           {filters.niveis.length === 0 ? (
             <p className="mt-2 text-[10px] text-amber-500/90 dark:text-amber-400/90">
@@ -218,7 +282,7 @@ export function RadarTerritoryFiltersPanel({
                     ? filters.anoMin
                     : catalog?.yearMax ?? filters.anoMax
                 }
-                disabled={disabled || anosDesativados}
+                disabled={paneDisabled || anosDesativados}
                 value={filters.anoMin}
                 onChange={(e) =>
                   atualizarCampo(
@@ -249,7 +313,7 @@ export function RadarTerritoryFiltersPanel({
                     ? filters.anoMax
                     : catalog?.yearMax ?? filters.anoMax
                 }
-                disabled={disabled || anosDesativados}
+                disabled={paneDisabled || anosDesativados}
                 value={filters.anoMax}
                 onChange={(e) =>
                   atualizarCampo(
@@ -284,9 +348,7 @@ export function RadarTerritoryFiltersPanel({
             Delito predominante ou presente nas agregações
           </span>
           <select
-            disabled={
-              disabled || catalog === null || (catalog.delitos?.length ?? 0) <= 1
-            }
+            disabled={delitosSelectOcioso}
             value={
               catalog && catalog.delitos.length <= 1
                 ? "__todos_delitos"
@@ -305,8 +367,7 @@ export function RadarTerritoryFiltersPanel({
             className={cn(
               "rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none ring-sky-500/30",
               "focus-visible:ring-4",
-              (disabled || catalog === null || delitoDesativado) &&
-                "cursor-not-allowed opacity-50"
+              delitosSelectOcioso && "cursor-not-allowed opacity-50"
             )}
           >
             <option value="__todos_delitos">Todos</option>

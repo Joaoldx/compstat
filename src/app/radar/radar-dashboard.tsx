@@ -2,9 +2,16 @@
 
 import dynamic from "next/dynamic"
 import { Bot } from "lucide-react"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { RadarAssistantSheet } from "@/components/radar/radar-assistant-sheet"
+import type { RadarMapDataStatus } from "@/components/radar-rio/rj-state-map"
+import { RadarTerritoryFiltersPanel } from "@/components/radar-rio/radar-territory-filters"
+import {
+  defaultRadarTerritoryFilters,
+  type RadarFilterCatalog,
+  type RadarTerritoryFiltersState,
+} from "@/lib/radar/radar-territory-filter"
 import { cn } from "@/lib/utils"
 
 const RjStateMap = dynamic(
@@ -24,10 +31,36 @@ const FAB_CLASSES =
 
 export function RadarDashboard() {
   const [assistOpen, setAssistOpen] = useState(false)
+  const [filters, setFilters] = useState<RadarTerritoryFiltersState>(() =>
+    defaultRadarTerritoryFilters()
+  )
+  const [catalog, setCatalog] = useState<RadarFilterCatalog | null>(null)
+  const [layerStats, setLayerStats] = useState<{ total: number; visible: number }>(
+    () => ({
+      total: 0,
+      visible: 0,
+    })
+  )
+  const [mapDataStatus, setMapDataStatus] = useState<RadarMapDataStatus>(() => ({
+    csvLoading: true,
+    csvFatalError: null,
+  }))
+  /** Aplica a faixa de anos do CSV uma vez quando o catálogo chega */
+  const syncAnoDosDadosCarregadosRef = useRef(false)
 
   const openAssist = useCallback(() => {
     setAssistOpen(true)
   }, [])
+
+  useEffect(() => {
+    if (!catalog || syncAnoDosDadosCarregadosRef.current) return
+    syncAnoDosDadosCarregadosRef.current = true
+    setFilters((f) => ({
+      ...f,
+      anoMin: catalog.yearMin,
+      anoMax: catalog.yearMax,
+    }))
+  }, [catalog])
 
   return (
     <div className="relative flex min-h-[calc(100dvh-3.5rem)] flex-col bg-background px-4 py-6 text-foreground md:px-8 md:py-8">
@@ -45,13 +78,34 @@ export function RadarDashboard() {
           <code className="rounded bg-muted px-1 py-px text-xs">
             npm run radar:crossed
           </code>
-          .
+          . Os controles para filtrar território ficam{" "}
+          <span className="font-medium text-foreground">
+            sempre abaixo do mapa nesta página
+          </span>
+          ; pode ser necessário percorrer a página um pouco se o seu ecrã for baixo.
         </p>
       </header>
 
-      <div className="relative mx-auto mt-6 flex min-h-0 w-full max-w-6xl min-w-0 flex-1 flex-col pb-20 lg:pb-24">
-        <div className="relative z-0 flex h-[min(72vh,820px)] min-h-[400px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ring-1 ring-border">
-          <RjStateMap className="h-full min-h-0 min-w-0 w-full flex-1" />
+      <div className="relative mx-auto mt-6 w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-32">
+        <div className="relative z-0 flex h-[min(56vh,640px)] min-h-[340px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ring-1 ring-border">
+          <RjStateMap
+            className="h-full min-h-0 min-w-0 w-full flex-1"
+            filters={filters}
+            onFilterCatalog={setCatalog}
+            onLayerStats={setLayerStats}
+            onMapDataStatus={setMapDataStatus}
+          />
+        </div>
+
+        <div className="w-full shrink-0 scroll-mt-[calc(env(safe-area-inset-bottom,0px)+8rem)]">
+          <RadarTerritoryFiltersPanel
+            csvFatalError={mapDataStatus.csvFatalError}
+            csvLoading={mapDataStatus.csvLoading}
+            catalog={catalog}
+            filters={filters}
+            stats={layerStats}
+            onChange={setFilters}
+          />
         </div>
 
         <button
