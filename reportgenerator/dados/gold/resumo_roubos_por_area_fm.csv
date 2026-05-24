@@ -1,0 +1,31 @@
+nome_area_fm,tem_camera,desc_delito,n_ocorrencias
+,false,Roubo a transeunte,59814
+,false,Roubo de aparelho celular,28877
+,false,Roubo em coletivo,10902
+Bangu: Calçadão - Bangu Shopping,true,Roubo a transeunte,363
+Bangu: Calçadão - Bangu Shopping,true,Roubo de aparelho celular,166
+Bangu: Calçadão - Bangu Shopping,true,Roubo em coletivo,30
+Campo Grande: Estação de Trem - Calçadão,true,Roubo a transeunte,222
+Campo Grande: Estação de Trem - Calçadão,true,Roubo de aparelho celular,82
+Campo Grande: Estação de Trem - Calçadão,true,Roubo em coletivo,14
+Estações São Francisco Xavier - Afonso Pena,true,Roubo a transeunte,958
+Estações São Francisco Xavier - Afonso Pena,true,Roubo de aparelho celular,648
+Estações São Francisco Xavier - Afonso Pena,true,Roubo em coletivo,65
+Jardim de Alah,true,Roubo a transeunte,249
+Jardim de Alah,true,Roubo de aparelho celular,140
+Jardim de Alah,true,Roubo em coletivo,8
+Metrô Botafogo - Rua São Clemente - Rua Voluntários da Pátria,true,Roubo a transeunte,632
+Metrô Botafogo - Rua São Clemente - Rua Voluntários da Pátria,true,Roubo de aparelho celular,303
+Metrô Botafogo - Rua São Clemente - Rua Voluntários da Pátria,true,Roubo em coletivo,36
+Praia de Botafogo - Rua Marquês de Abrantes,true,Roubo a transeunte,837
+Praia de Botafogo - Rua Marquês de Abrantes,true,Roubo de aparelho celular,465
+Praia de Botafogo - Rua Marquês de Abrantes,true,Roubo em coletivo,80
+Presidente Vargas - Campo de Santana - Central do Brasil - Cinelândia,true,Roubo a transeunte,4385
+Presidente Vargas - Campo de Santana - Central do Brasil - Cinelândia,true,Roubo de aparelho celular,1619
+Presidente Vargas - Campo de Santana - Central do Brasil - Cinelândia,true,Roubo em coletivo,442
+Rodoviária - Terminal Gentileza - Estação Leopoldina,true,Roubo a transeunte,1010
+Rodoviária - Terminal Gentileza - Estação Leopoldina,true,Roubo de aparelho celular,485
+Rodoviária - Terminal Gentileza - Estação Leopoldina,true,Roubo em coletivo,720
+Rua Lauro Müller – Avenida General Severiano – Avenida Venceslau Brás,true,Roubo a transeunte,374
+Rua Lauro Müller – Avenida General Severiano – Avenida Venceslau Brás,true,Roubo de aparelho celular,247
+Rua Lauro Müller – Avenida General Severiano – Avenida Venceslau Brás,true,Roubo em coletivo,43

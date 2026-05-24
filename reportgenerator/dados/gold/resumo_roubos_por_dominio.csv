@@ -1,0 +1,60 @@
+dominio_orcrim,desc_delito,ano,n_ocorrencias
+ADA,Roubo a transeunte,2020,132
+ADA,Roubo a transeunte,2021,103
+ADA,Roubo a transeunte,2022,53
+ADA,Roubo a transeunte,2023,37
+ADA,Roubo a transeunte,2024,35
+ADA,Roubo de aparelho celular,2020,66
+ADA,Roubo de aparelho celular,2021,37
+ADA,Roubo de aparelho celular,2022,34
+ADA,Roubo de aparelho celular,2023,33
+ADA,Roubo de aparelho celular,2024,41
+ADA,Roubo em coletivo,2020,4
+ADA,Roubo em coletivo,2021,4
+ADA,Roubo em coletivo,2022,3
+ADA,Roubo em coletivo,2024,1
+CV,Roubo a transeunte,2020,659
+CV,Roubo a transeunte,2021,563
+CV,Roubo a transeunte,2022,378
+CV,Roubo a transeunte,2023,302
+CV,Roubo a transeunte,2024,285
+CV,Roubo de aparelho celular,2020,226
+CV,Roubo de aparelho celular,2021,204
+CV,Roubo de aparelho celular,2022,181
+CV,Roubo de aparelho celular,2023,178
+CV,Roubo de aparelho celular,2024,220
+CV,Roubo em coletivo,2020,102
+CV,Roubo em coletivo,2021,92
+CV,Roubo em coletivo,2022,49
+CV,Roubo em coletivo,2023,52
+CV,Roubo em coletivo,2024,47
+Milícia,Roubo a transeunte,2020,552
+Milícia,Roubo a transeunte,2021,564
+Milícia,Roubo a transeunte,2022,404
+Milícia,Roubo a transeunte,2023,323
+Milícia,Roubo a transeunte,2024,409
+Milícia,Roubo de aparelho celular,2020,252
+Milícia,Roubo de aparelho celular,2021,173
+Milícia,Roubo de aparelho celular,2022,190
+Milícia,Roubo de aparelho celular,2023,196
+Milícia,Roubo de aparelho celular,2024,291
+Milícia,Roubo em coletivo,2020,80
+Milícia,Roubo em coletivo,2021,86
+Milícia,Roubo em coletivo,2022,63
+Milícia,Roubo em coletivo,2023,25
+Milícia,Roubo em coletivo,2024,56
+TCP,Roubo a transeunte,2020,279
+TCP,Roubo a transeunte,2021,238
+TCP,Roubo a transeunte,2022,169
+TCP,Roubo a transeunte,2023,135
+TCP,Roubo a transeunte,2024,121
+TCP,Roubo de aparelho celular,2020,83
+TCP,Roubo de aparelho celular,2021,81
+TCP,Roubo de aparelho celular,2022,56
+TCP,Roubo de aparelho celular,2023,50
+TCP,Roubo de aparelho celular,2024,118
+TCP,Roubo em coletivo,2020,50
+TCP,Roubo em coletivo,2021,59
+TCP,Roubo em coletivo,2022,38
+TCP,Roubo em coletivo,2023,23
+TCP,Roubo em coletivo,2024,33
